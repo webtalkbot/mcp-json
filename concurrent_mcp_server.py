@@ -20,7 +20,19 @@ from concurrent.futures import ThreadPoolExecutor
 import aiofiles
 import weakref
 from functools import wraps
-from security_manager import get_security_manager
+try:
+    from security_manager import get_security_manager
+except ImportError:
+    # Fallback if security_manager is not available
+    def get_security_manager(config_dir="."):
+        class MockSecurityManager:
+            async def initialize(self, session): pass
+            async def get_security_context(self, server_name): 
+                from security_providers import SecurityContext
+                return SecurityContext({}, {}, {}, {'provider': 'fallback'})
+            def apply_security_to_request(self, server_name, context, headers, params):
+                return {'headers': headers, 'params': params, 'cookies': {}}
+        return MockSecurityManager()
 
 # MCP imports
 try:

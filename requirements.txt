@@ -1,6 +1,6 @@
 requests
 psutil
-mcp
+mcp==1.1.0
 aiohttp
 fastapi 
 uvicorn 
