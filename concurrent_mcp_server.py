@@ -41,8 +41,27 @@ try:
     from mcp.types import Resource, Tool, TextContent
     import mcp.types as types
     from mcp.server.stdio import stdio_server
-except ImportError:
-    sys.stderr.write("Missing MCP library. Install: pip install mcp\n")
+except ImportError as e:
+    error_msg = f"Missing MCP library: {e}. Install: pip install mcp"
+    sys.stderr.write(f"❌ CRITICAL ERROR: {error_msg}\n")
+    
+    # Log to error log if possible
+    try:
+        import logging
+        logging.basicConfig(level=logging.ERROR)
+        logger = logging.getLogger(__name__)
+        logger.error(f"MCP Import Error: {error_msg}")
+        
+        # Try to log to our error logger
+        try:
+            from error_logger import log_custom_error
+            log_custom_error("CRITICAL", "MCP_IMPORT_ERROR", "concurrent_mcp_server", 
+                           error_msg, e, {"import_error": str(e)})
+        except Exception:
+            pass  # Error logger might not be available yet
+    except Exception:
+        pass
+    
     sys.exit(1)
 
 # HTTP Retry decorator for network operations
@@ -924,7 +943,7 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
         return [types.TextContent(type="text", text=f"❌ Unexpected error: {str(e)}")]
 
 async def main():
-    """Thread-safe main function with security manager"""
+    """Thread-safe main function with security manager and robust error handling"""
     global session, config_manager
     
     try:
@@ -933,53 +952,183 @@ async def main():
         print(f"📁 INFO: Script directory: {script_dir}")
         
         # Creates thread-safe config manager
-        config_manager = ThreadSafeConfigManager(config_dir=script_dir)
+        try:
+            config_manager = ThreadSafeConfigManager(config_dir=script_dir)
+            print(f"✅ INFO: Config manager created successfully")
+        except Exception as e:
+            error_msg = f"Failed to create config manager: {e}"
+            print(f"❌ ERROR: {error_msg}")
+            try:
+                from error_logger import log_custom_error
+                log_custom_error("CRITICAL", "CONFIG_MANAGER_ERROR", "concurrent_mcp_server", 
+                               error_msg, e, {"script_dir": script_dir})
+            except Exception:
+                pass
+            sys.exit(1)
         
         # Creates connection pool
-        connector = aiohttp.TCPConnector(
-            limit=100,
-            limit_per_host=30,
-            ttl_dns_cache=300,
-            use_dns_cache=True,
-            keepalive_timeout=60,
-            enable_cleanup_closed=True
-        )
+        try:
+            connector = aiohttp.TCPConnector(
+                limit=100,
+                limit_per_host=30,
+                ttl_dns_cache=300,
+                use_dns_cache=True,
+                keepalive_timeout=60,
+                enable_cleanup_closed=True
+            )
+            
+            timeout = aiohttp.ClientTimeout(total=30, connect=10, sock_read=30)
+            print(f"✅ INFO: HTTP connector and timeout configured")
+        except Exception as e:
+            error_msg = f"Failed to create HTTP connector: {e}"
+            print(f"❌ ERROR: {error_msg}")
+            try:
+                from error_logger import log_custom_error
+                log_custom_error("CRITICAL", "HTTP_CONNECTOR_ERROR", "concurrent_mcp_server", 
+                               error_msg, e)
+            except Exception:
+                pass
+            sys.exit(1)
         
-        timeout = aiohttp.ClientTimeout(total=30, connect=10, sock_read=30)
-        
-        async with aiohttp.ClientSession(
-            timeout=timeout, 
-            connector=connector
-        ) as http_session:
-            session = http_session
-            
-            # NEW: Initialize security manager
-            security_manager = get_security_manager(script_dir)
-            await security_manager.initialize(http_session)
-            
-            # Shows available servers at startup
-            servers = await config_manager.discover_servers()
-            print(f"🚀 INFO: Concurrent Config MCP Server started")
-            print(f"📋 INFO: Found {len(servers)} servers: {servers}")
-            print(f"🔒 INFO: Security manager initialized")
-            
-            async with stdio_server() as (read_stream, write_stream):
-                # MCP Protocol version 2025-03-26 compliance
-                init_options = InitializationOptions(
-                    server_name="concurrent-config-mcp-server",
-                    server_version="1.0.0",
-                    capabilities=server.get_capabilities(
-                        notification_options=NotificationOptions(),
-                        experimental_capabilities={}
-                    ),
-                    protocol_version="2024-11-05"  # 🔧 FIXED: Unified MCP Protocol version
-                )
+        # Start HTTP session
+        try:
+            async with aiohttp.ClientSession(
+                timeout=timeout, 
+                connector=connector
+            ) as http_session:
+                session = http_session
+                print(f"✅ INFO: HTTP session started")
                 
-                print(f"🔌 INFO: MCP Server initialized with protocol version: 2024-11-05")
-                await server.run(read_stream, write_stream, init_options)
+                # Initialize security manager
+                try:
+                    security_manager = get_security_manager(script_dir)
+                    await security_manager.initialize(http_session)
+                    print(f"✅ INFO: Security manager initialized")
+                except Exception as e:
+                    error_msg = f"Security manager initialization failed: {e}"
+                    print(f"⚠️ WARNING: {error_msg}")
+                    try:
+                        from error_logger import log_custom_error
+                        log_custom_error("WARNING", "SECURITY_INIT_ERROR", "concurrent_mcp_server", 
+                                       error_msg, e, {"script_dir": script_dir})
+                    except Exception:
+                        pass
+                    # Continue without security manager
+                
+                # Discover servers
+                try:
+                    servers = await config_manager.discover_servers()
+                    print(f"🚀 INFO: Concurrent Config MCP Server started")
+                    print(f"📋 INFO: Found {len(servers)} servers: {servers}")
+                except Exception as e:
+                    error_msg = f"Server discovery failed: {e}"
+                    print(f"⚠️ WARNING: {error_msg}")
+                    try:
+                        from error_logger import log_custom_error
+                        log_custom_error("WARNING", "SERVER_DISCOVERY_ERROR", "concurrent_mcp_server", 
+                                       error_msg, e, {"script_dir": script_dir})
+                    except Exception:
+                        pass
+                    servers = []
+                
+                # Start MCP server
+                try:
+                    async with stdio_server() as (read_stream, write_stream):
+                        print(f"✅ INFO: stdio_server started")
+                        
+                        # MCP Protocol version 2025-03-26 compliance
+                        try:
+                            init_options = InitializationOptions(
+                                server_name="concurrent-config-mcp-server",
+                                server_version="1.0.0",
+                                capabilities=server.get_capabilities(
+                                    notification_options=NotificationOptions(),
+                                    experimental_capabilities={}
+                                ),
+                                protocol_version="2024-11-05"  # 🔧 FIXED: Unified MCP Protocol version
+                            )
+                            
+                            print(f"🔌 INFO: MCP Server initialized with protocol version: 2024-11-05")
+                        except Exception as e:
+                            error_msg = f"Failed to create initialization options: {e}"
+                            print(f"❌ ERROR: {error_msg}")
+                            try:
+                                from error_logger import log_custom_error
+                                log_custom_error("CRITICAL", "INIT_OPTIONS_ERROR", "concurrent_mcp_server", 
+                                               error_msg, e)
+                            except Exception:
+                                pass
+                            sys.exit(1)
+                        
+                        # Run the server
+                        try:
+                            print(f"🚀 INFO: Starting MCP server.run()...")
+                            await server.run(read_stream, write_stream, init_options)
+                        except Exception as e:
+                            error_msg = f"MCP server.run() failed: {e}"
+                            print(f"❌ ERROR: {error_msg}")
+                            try:
+                                from error_logger import log_custom_error
+                                log_custom_error("CRITICAL", "SERVER_RUN_ERROR", "concurrent_mcp_server", 
+                                               error_msg, e, {
+                                                   "server_name": "concurrent-config-mcp-server",
+                                                   "protocol_version": "2024-11-05"
+                                               })
+                            except Exception:
+                                pass
+                            raise
+                            
+                except Exception as e:
+                    error_msg = f"stdio_server context error: {e}"
+                    print(f"❌ ERROR: {error_msg}")
+                    try:
+                        from error_logger import log_custom_error
+                        log_custom_error("CRITICAL", "STDIO_SERVER_ERROR", "concurrent_mcp_server", 
+                                       error_msg, e)
+                    except Exception:
+                        pass
+                    raise
+                    
+        except Exception as e:
+            error_msg = f"HTTP session error: {e}"
+            print(f"❌ ERROR: {error_msg}")
+            try:
+                from error_logger import log_custom_error
+                log_custom_error("CRITICAL", "HTTP_SESSION_ERROR", "concurrent_mcp_server", 
+                               error_msg, e)
+            except Exception:
+                pass
+            raise
+    
+    except KeyboardInterrupt:
+        print(f"🛑 INFO: Server shutdown requested (Ctrl+C)")
+        try:
+            from error_logger import log_custom_error
+            log_custom_error("INFO", "SHUTDOWN", "concurrent_mcp_server", 
+                           "Server shutdown requested by user")
+        except Exception:
+            pass
+        sys.exit(0)
     
     except Exception as e:
-        print(f"❌ ERROR: Server error: {e}")
+        error_msg = f"Critical server error: {e}"
+        print(f"❌ CRITICAL ERROR: {error_msg}")
+        
+        # Log with full traceback
+        try:
+            import traceback
+            traceback_str = traceback.format_exc()
+            print(f"❌ TRACEBACK:\n{traceback_str}")
+            
+            from error_logger import log_custom_error
+            log_custom_error("CRITICAL", "MAIN_FUNCTION_ERROR", "concurrent_mcp_server", 
+                           error_msg, e, {
+                               "traceback": traceback_str,
+                               "error_type": type(e).__name__
+                           })
+        except Exception as log_error:
+            print(f"⚠️ WARNING: Could not log error: {log_error}")
+        
         sys.exit(1)
 
 if __name__ == "__main__":
