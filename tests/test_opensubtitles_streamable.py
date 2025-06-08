@@ -69,22 +69,36 @@ class OpenSubtitlesStreamableTest:
         print("🔧 MCP Server Connection Test")
         print("-" * 50)
         
-        # Check server health
+        # Test direct streamable endpoint instead of health check
         try:
-            async with self.session.get(f"{self.base_url}/health") as resp:
+            test_request = {
+                "jsonrpc": "2.0",
+                "id": 0,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-03-26",
+                    "capabilities": {}
+                }
+            }
+            
+            async with self.session.post(self.streamable_url, json=test_request) as resp:
                 if resp.status == 200:
-                    health = await resp.json()
-                    print(f"✅ MCP Server: {health.get('status', 'unknown')}")
-                    print("✅ Server is available on localhost:8999")
+                    result = await resp.json()
+                    if "result" in result:
+                        print("✅ MCP Server: OpenSubtitles endpoint responding")
+                        print("✅ Server is available on localhost:8999")
+                        print(f"✅ Protocol: {result['result'].get('protocolVersion', 'unknown')}")
+                        return True
+                    else:
+                        print(f"❌ MCP Server returned unexpected response: {result}")
+                        return False
                 else:
-                    print(f"❌ MCP Server health check failed: {resp.status}")
+                    print(f"❌ MCP Server streamable endpoint failed: {resp.status}")
                     return False
         except Exception as e:
             print(f"❌ Cannot connect to MCP server: {e}")
-            print("   Check if running: python concurrent_mcp_server.py")
+            print("   Check if running: python mcp_wrapper.py")
             return False
-            
-        return True
     
     async def test_mcp_initialize(self) -> bool:
         """Test MCP initialize"""
