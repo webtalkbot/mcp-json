@@ -110,8 +110,8 @@ To use this software for commercial purposes, you must either:
 
   Commercial License Pricing (based on annual revenue):
   - $9 USD/year for newly incorporated companies (requires official incorporation documents proving company was established within the last 3 months from license application date) - automatically listed in public registry
-  - $99 USD/year for companies with annual revenue from $0 to $100,000 USD (10% discount if company agrees to be listed in public registry: $89.10)
-  - $499 USD/year for companies with annual revenue from $101,000 to $999,000 USD (10% discount if company agrees to be listed in public registry: $449.10)
+  - $99 USD/year for companies with annual revenue from $0 to $99,999.99 USD (10% discount if company agrees to be listed in public registry: $89.10)
+  - $499 USD/year for companies with annual revenue from $100,000 to $999,999.99 USD (10% discount if company agrees to be listed in public registry: $449.10)
   - $999 USD/year for companies with annual revenue of $1,000,000 USD or more (10% discount if company agrees to be listed in public registry: $899.10)
   
   Self-reported annual revenue. License holders may be asked to provide 
