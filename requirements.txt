@@ -9,3 +9,4 @@ aiolimiter
 aiofiles
 pydantic
 python-dotenv
+pytest
