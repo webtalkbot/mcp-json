@@ -44,17 +44,17 @@ EXPRESS OR IMPLIED, INCLUDING (WITHOUT LIMITATION) WARRANTIES OF
 MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, AND 
 TITLE.
 
-Contributor Commercial License Grant
+Special Contributor Commercial License Grant
 
 SIGNIFICANT CONTRIBUTOR PRIVILEGES:
 Contributors who make significant contributions to this project may be granted 
-a "Contributor Commercial License" at the sole discretion of the Licensor. 
+a "Special Contributor Commercial License" at the sole discretion of the Licensor. 
 This grant provides the following rights:
 
 1. LIFETIME COMMERCIAL USE: Right to use the Licensed Work for commercial 
   purposes for the lifetime of the contributor without payment.
 
-2. SINGLE ENTITY TRANSFER: Right to transfer, lease, or lend the commercial 
+2. SINGLE ENTITY TRANSFER: Right to transfer, lease, or lend the special commercial 
   license to ONE (1) other legal entity at a time, subject to the following 
   conditions:
   - Only one active transfer/lease/loan at any given time
@@ -66,7 +66,7 @@ This grant provides the following rights:
 3. REVOCATION: The Licensor reserves the right to revoke this grant if the 
   contributor violates the terms or acts against the project's interests.
 
-4. PUBLIC REGISTRY: Contributors who transfer, lease, or lend their commercial 
+4. PUBLIC REGISTRY: Contributors who transfer, lease, or lend their special commercial 
   license to another entity will be automatically listed in the public registry at:
   https://github.com/webtalkbot/mcp-json/tree/main/enterprise
 
@@ -76,6 +76,8 @@ the Licensor and includes:
 - Adding code that extends the functionality of the application, approved by the Licensor via commits on GitHub.
 - Fixing any bugs in the code that improve its performance or functionality, approved by the Licensor via commits on GitHub.
 - Contributing to the project documentation, approved by the Licensor via commits on GitHub.
+
+All such approved contributions are automatically considered significant and the contributor is entitled to a Special Contributor Commercial License upon email request.
 
 Additional Use Grant: None
 
@@ -117,15 +119,15 @@ To use this software for commercial purposes, you must either:
   Self-reported annual revenue. License holders may be asked to provide 
   verification during audit.
 
-2. Be a significant contributor with a granted Contributor Commercial License
+2. Be a significant contributor with a granted Special Contributor Commercial License
 
-3. Be an authorized recipient of a transferred/leased Contributor Commercial License
+3. Be an authorized recipient of a transferred/leased Special Contributor Commercial License
 
 ENTERPRISE REGISTRY:
 The following entities will be listed in the public registry at:
 https://github.com/webtalkbot/mcp-json/tree/main/enterprise
 
-- Contributors who transfer, lease, or lend their commercial license (mandatory)
+- Contributors who transfer, lease, or lend their Special Contributor Commercial License (mandatory)
 - Newly incorporated companies with $9 USD startup license (mandatory)
 - Regular commercial license holders who opt-in for 10% discount (optional)
 
