@@ -89,13 +89,16 @@ This grant provides the following rights:
   https://github.com/webtalkbot/mcp-json/tree/main/enterprise
 
 SIGNIFICANT CONTRIBUTION CRITERIA:
-The determination of "significant contribution" is at the sole discretion of 
-the Licensor and includes:
-- Adding code that extends the functionality of the application, approved by the Licensor via commits on GitHub.
-- Fixing any bugs in the code that improve its performance or functionality, approved by the Licensor via commits on GitHub.
-- Contributing to the project documentation, approved by the Licensor via commits on GitHub.
+Every approved contribution on GitHub is automatically considered significant. 
+Any contributor who has an approved commit on GitHub is entitled to request 
+a Special Contributor Commercial License. This includes:
+- Any code contribution that extends the functionality of the application, approved by the Licensor via commits on GitHub
+- Any bug fixes that improve performance or functionality, approved by the Licensor via commits on GitHub
+- Any contribution to project documentation, approved by the Licensor via commits on GitHub
+- Any other approved changes to the project, approved by the Licensor via commits on GitHub
 
-All such approved contributions are automatically considered significant and the contributor is entitled to a Special Contributor Commercial License upon email request.
+All contributors with approved GitHub commits are automatically entitled to 
+a Special Contributor Commercial License upon email request.
 
 Additional Use Grant: None
 
