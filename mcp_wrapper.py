@@ -61,6 +61,9 @@ app = FastAPI(title="MCP Server Manager with Individual HTTP MCP Endpoints", ver
 # Global database
 db = MCPDatabase()
 
+# Import tools proxy
+from tools_proxy import ToolsProxy
+
 class MCPProcess:
     """Wrapper for MCP server process with async communication (no ports - stdin/stdout)"""
     
@@ -723,6 +726,9 @@ class ProcessManager:
 # Global process manager
 process_manager = ProcessManager()
 
+# Global tools proxy
+tools_proxy = ToolsProxy(process_manager)
+
 # Streamable Session Manager
 class StreamableSessionManager:
     """Manager for Streamable HTTP connections with clients"""
@@ -872,12 +878,19 @@ async def root():
             "streamable_transport_endpoints": streamable_endpoints,
             "global_streamable": "/streamable",
             "global_sse_deprecated": "/sse (deprecated)",
-            "discovery": "/.well-known/mcp"
+            "discovery": "/.well-known/mcp",
+            "global_tools_proxy": {
+                "tools_list": "/mcp/tools/list",
+                "tools_call": "/mcp/tools/call", 
+                "tools_stats": "/mcp/tools/stats",
+                "tools_refresh": "/mcp/tools/refresh"
+            }
         },
         "usage": {
             "claude_desktop_url": "http://localhost:8999/servers/{server_name}/streamable",
             "claude_desktop_url_deprecated": "http://localhost:8999/servers/{server_name}/sse (deprecated)",
             "rest_api_example": "http://localhost:8999/servers/{server_name}/mcp/tools/list",
+            "global_tools_example": "http://localhost:8999/mcp/tools/list",
             "health_check": "/health"
         }
     }
@@ -988,6 +1001,185 @@ async def mcp_global_capabilities():
         },
         "transport": "http"
     }
+
+# ===============================
+# 🔧 GLOBAL TOOLS PROXY ENDPOINTS
+# ===============================
+
+@app.get("/mcp/tools/list")
+async def mcp_global_tools_list():
+    """
+    🆕 FIXED: Global MCP Tools List - aggregates tools from all running servers
+    Resolves naming conflicts with server prefixes (server__toolname)
+    """
+    logger.info("🔧 Global Tools: Getting aggregated tools from all servers")
+    
+    try:
+        # Get aggregated tools from all servers via tools proxy
+        aggregated_tools = await tools_proxy.get_all_tools()
+        
+        logger.info(f"🔧 Global Tools: Returning {len(aggregated_tools)} tools from all servers")
+        
+        return {
+            "tools": aggregated_tools
+        }
+        
+    except Exception as e:
+        logger.error(f"🔧 Global Tools: Error aggregating tools: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to aggregate tools: {str(e)}")
+
+@app.post("/mcp/tools/call")
+async def mcp_global_tools_call(request_data: dict):
+    """
+    🆕 FIXED: Global MCP Tools Call - automatic proxy routing to appropriate server
+    Handles namespaced tool names (server__toolname) and routes to correct server
+    """
+    logger.info("🔧 Global Tools: Processing tool call with automatic routing")
+    
+    try:
+        tool_name = request_data.get("name")
+        arguments = request_data.get("arguments", {})
+        
+        if not tool_name:
+            raise HTTPException(status_code=400, detail="Missing tool name")
+        
+        logger.info(f"🔧 Global Tools: Calling tool {tool_name} with arguments: {arguments}")
+        
+        # Use tools proxy to route the call to appropriate server
+        response = await tools_proxy.call_tool(tool_name, arguments)
+        
+        # Check if it's an error response
+        if "error" in response:
+            error_info = response["error"]
+            error_message = error_info.get("message", "Unknown error")
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"❌ **Error:** {error_message}"
+                    }
+                ]
+            }
+        
+        elif "result" in response:
+            # Successful response
+            tool_result = response["result"]
+            
+            if isinstance(tool_result, list) and len(tool_result) > 0:
+                # MCP tools/call response - list of TextContent
+                first_item = tool_result[0]
+                if isinstance(first_item, dict) and "text" in first_item:
+                    return {
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": first_item["text"]
+                            }
+                        ]
+                    }
+            
+            # Fallback - convert to JSON
+            if isinstance(tool_result, (dict, list)):
+                formatted_result = json.dumps(tool_result, indent=2, ensure_ascii=False)
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"✅ **Successful response:**\n```json\n{formatted_result}\n```"
+                        }
+                    ]
+                }
+            else:
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"✅ **Response:** {str(tool_result)}"
+                        }
+                    ]
+                }
+        
+        else:
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"❌ Unexpected response format: {response}"
+                    }
+                ]
+            }
+            
+    except Exception as e:
+        logger.error(f"🔧 Global Tools: Error calling tool: {e}")
+        return {
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"❌ **System error:** {str(e)}"
+                }
+            ]
+        }
+
+@app.get("/mcp/tools/stats")
+async def mcp_global_tools_stats():
+    """
+    🆕 NEW: Global Tools Statistics - cache stats and server breakdown
+    """
+    try:
+        cache_stats = tools_proxy.get_cache_stats()
+        
+        # Get tools breakdown by server
+        servers_breakdown = {}
+        for server_name in process_manager.processes.keys():
+            try:
+                server_tools = await tools_proxy.get_tools_by_server(server_name)
+                servers_breakdown[server_name] = {
+                    "tool_count": len(server_tools),
+                    "status": "running" if process_manager.processes[server_name].is_running() else "stopped"
+                }
+            except Exception as e:
+                servers_breakdown[server_name] = {
+                    "tool_count": 0,
+                    "status": "error",
+                    "error": str(e)
+                }
+        
+        return {
+            "cache_stats": cache_stats,
+            "servers_breakdown": servers_breakdown,
+            "total_servers": len(servers_breakdown),
+            "total_tools_cached": cache_stats["cached_tools"],
+            "proxy_status": "active"
+        }
+        
+    except Exception as e:
+        logger.error(f"🔧 Global Tools: Error getting stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/mcp/tools/refresh")
+async def mcp_global_tools_refresh():
+    """
+    🆕 NEW: Manual cache refresh for global tools
+    """
+    try:
+        logger.info("🔧 Global Tools: Manually refreshing tools cache")
+        
+        # Force refresh tools cache
+        aggregated_tools = await tools_proxy.get_all_tools(force_refresh=True)
+        
+        cache_stats = tools_proxy.get_cache_stats()
+        
+        logger.info(f"🔧 Global Tools: Cache refreshed - {len(aggregated_tools)} tools cached")
+        
+        return {
+            "message": "Tools cache refreshed successfully",
+            "tools_count": len(aggregated_tools),
+            "cache_stats": cache_stats
+        }
+        
+    except Exception as e:
+        logger.error(f"🔧 Global Tools: Error refreshing cache: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Read-only Management REST API Endpoints
 @app.get("/servers")
