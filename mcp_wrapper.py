@@ -2140,42 +2140,25 @@ async def _streamable_send_initialize(session_id: str, server_name: str):
         logger.info(f"Streamable: Starting proper MCP initialization handshake for session {session_id}")
         
         # FIXED: Check if underlying MCP server is properly initialized first
-        if server_name not in process_manager.processes:
+        server_status = process_manager.get_server_status(server_name)
+        if server_status.get("status") != "running":
             raise Exception(f"Server {server_name} is not running")
         
-        mcp_process = process_manager.processes[server_name]
-        if not mcp_process.initialized:
+        if not server_status.get("initialized", False):
             raise Exception(f"Server {server_name} is not properly initialized - cannot create Streamable session")
         
-        # FIXED: Get actual server capabilities from the running MCP server
-        try:
-            # Query the real server for its capabilities
-            server_response = await process_manager.send_request_to_server(server_name, "capabilities")
-            server_capabilities = server_response.get("result", {}).get("capabilities", {
-                "tools": {},
-                "resources": {},
-                "prompts": {},
-                "logging": {}
-            })
-            server_info = server_response.get("result", {}).get("serverInfo", {
-                "name": f"mcp-server-{server_name}",
-                "version": "1.0.0"
-            })
-            logger.info(f"Streamable: Retrieved real capabilities from server {server_name}")
-            
-        except Exception as e:
-            logger.warning(f"Streamable: Could not get server capabilities, using defaults: {e}")
-            # Fallback to default capabilities
-            server_capabilities = {
-                "tools": {},
-                "resources": {},
-                "prompts": {},
-                "logging": {}
-            }
-            server_info = {
-                "name": f"mcp-server-{server_name}",
-                "version": "1.0.0"
-            }
+        # FIXED: Use default capabilities for streamable (avoid server capabilities call)
+        server_capabilities = {
+            "tools": {},
+            "resources": {},
+            "prompts": {},
+            "logging": {}
+        }
+        server_info = {
+            "name": f"mcp-server-{server_name}",
+            "version": "1.0.0"
+        }
+        logger.info(f"Streamable: Using default capabilities for session {session_id}")
         
         # FIXED: Send proper MCP initialize response with real server data
         initialize_response = {
