@@ -711,7 +711,39 @@ class ProcessManager:
             logger.critical(f"❌ Max restart attempts ({self.max_restart_attempts}) reached for {server_name}, giving up")
             return
         
-        logger.warning(f"🔄 Server {server_name} is dead, attempting restart (attempt {restart_count + 1}/{self.max_restart_attempts})")
+        # Get server info for logging context
+        server_config = db.get_server(server_name)
+        process_info = None
+        exit_code = None
+        
+        # Get process details if available
+        if server_name in self.processes:
+            mcp_process = self.processes[server_name]
+            if mcp_process.process:
+                exit_code = mcp_process.process.poll()
+                process_info = {
+                    "pid": mcp_process.process.pid if mcp_process.process else None,
+                    "exit_code": exit_code,
+                    "was_initialized": mcp_process.initialized,
+                    "was_running": mcp_process.running
+                }
+        
+        logger.warning(f"🔄 Server {server_name} is dead (exit_code: {exit_code}), attempting restart (attempt {restart_count + 1}/{self.max_restart_attempts})")
+        
+        # Log the process failure detection
+        log_custom_error("WARNING", "PROCESS_FAILURE_DETECTED", server_name, 
+                         f"Process monitoring detected server {server_name} failure", 
+                         context={
+                             "detection_reason": "process_not_running",
+                             "exit_code": exit_code,
+                             "process_info": process_info,
+                             "server_config": {
+                                 "script_path": server_config.get('script_path') if server_config else None,
+                                 "auto_start": server_config.get('auto_start') if server_config else None
+                             },
+                             "restart_attempt": restart_count + 1,
+                             "max_attempts": self.max_restart_attempts
+                         })
         
         try:
             # Clean up dead process
