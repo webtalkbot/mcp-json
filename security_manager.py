@@ -21,17 +21,28 @@ class SecurityManager:
         self.config_dir = Path(config_dir)
         self._providers: Dict[str, SecurityProvider] = {}
         self._contexts: Dict[str, SecurityContext] = {}
-        self._lock = asyncio.Lock()
+        self._lock = None  # Will be created in initialize()
         self._session: Optional[aiohttp.ClientSession] = None
+        self._initialized = False
         
     async def initialize(self, session: aiohttp.ClientSession):
         """Initialize with HTTP session"""
         try:
+            # Create async objects only after event loop is available
+            if self._lock is None:
+                self._lock = asyncio.Lock()
+            
             self._session = session
+            self._initialized = True
             await self._load_all_security_configs()
         except Exception as e:
             logger.error(f"Error initializing SecurityManager: {e}")
             # Continue even without loaded configs - fallback to 'none' providers
+    
+    async def _ensure_initialized(self):
+        """Ensure SecurityManager is properly initialized"""
+        if not self._initialized or self._lock is None:
+            raise RuntimeError("SecurityManager is not initialized. Call initialize() first.")
     
     async def _load_all_security_configs(self):
         """Load all security configurations from servers/ directory"""
@@ -93,8 +104,7 @@ class SecurityManager:
     
     async def get_security_context(self, server_name: str) -> SecurityContext:
         """Get valid security context for server"""
-        if not self._session:
-            raise RuntimeError("SecurityManager is not initialized")
+        await self._ensure_initialized()
         
         async with self._lock:
             if server_name not in self._providers:
@@ -179,6 +189,8 @@ class SecurityManager:
     async def refresh_authentication(self, server_name: str) -> bool:
         """Force refresh authentication for server"""
         try:
+            await self._ensure_initialized()
+            
             async with self._lock:
                 # Clear cached context
                 if server_name in self._contexts:
@@ -194,6 +206,8 @@ class SecurityManager:
     async def list_servers_auth_status(self) -> List[Dict[str, Any]]:
         """Return authentication status for all servers"""
         try:
+            await self._ensure_initialized()
+            
             async with self._lock:
                 results = []
                 

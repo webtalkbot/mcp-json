@@ -284,20 +284,34 @@ class ConcurrentRESTClient:
             text = text.replace(placeholder, str(value))
         return text
     
-    def _prepare_url_and_params(self, url: str, query_params: Dict[str, str], 
-                               user_params: Dict[str, Any]) -> tuple:
-        """Prepares URL and query parameters"""
-        # Replaces placeholders in URL
-        final_url = self._substitute_placeholders(url, user_params)
+    def _prepare_url_and_params(self, url: str, path_params: Dict[str, str], 
+                               query_params: Dict[str, str], user_params: Dict[str, Any]) -> tuple:
+        """Prepares URL with path parameters and query parameters"""
         
-        # Prepares query parameters
+        # First, merge path_params from config with user_params for path substitution
+        all_path_params = {}
+        all_path_params.update(path_params)  # Default values from config
+        all_path_params.update(user_params)  # User-provided values override defaults
+        
+        # Replace {placeholders} in URL with path parameters
+        final_url = self._substitute_placeholders(url, all_path_params)
+        
+        # Prepare query parameters (never go into URL path)
         final_params = {}
+        
+        # Add configured query parameters first
         for key, value in query_params.items():
             final_params[key] = self._substitute_placeholders(str(value), user_params)
         
-        # Adds additional parameters from user_params (if not in URL)RetryClaude can make mistakes. Please double-check responses.
+        # Add additional query parameters from user_params 
+        # (but skip those that were used as path parameters)
+        used_path_keys = set()
+        for key in all_path_params.keys():
+            if f"{{{key}}}" in url:
+                used_path_keys.add(key)
+        
         for key, value in user_params.items():
-            if f"{{{key}}}" not in url and key not in final_params:
+            if key not in used_path_keys and key not in final_params:
                 final_params[key] = str(value)
         
         return final_url, final_params
@@ -344,6 +358,8 @@ class ConcurrentRESTClient:
                 method = endpoint.get("method", "GET").upper()
                 url = endpoint.get("url", "")
                 endpoint_headers = endpoint.get("headers", {})
+                # Separate handling for path_params and query_params
+                path_params = endpoint.get("path_params", {})
                 query_params = endpoint.get("params", endpoint.get("query_params", {}))
                 body_template = endpoint.get("body_template", "")
                 timeout = endpoint.get("timeout", 30)
@@ -367,7 +383,7 @@ class ConcurrentRESTClient:
                 headers = self._merge_headers(config.headers, endpoint_headers)
                 
                 # Prepares URL and parameters
-                final_url, final_params = self._prepare_url_and_params(url, query_params, params)
+                final_url, final_params = self._prepare_url_and_params(url, path_params, query_params, params)
                 
                 # NEW: Apply security if available
                 cookies = {}

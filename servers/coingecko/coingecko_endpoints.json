@@ -8,7 +8,7 @@
     "url": "https://api.coingecko.com/api/v3/simple/price",
     "method": "GET",
     "description": "Get current price of one or more coins in any currency",
-    "params": {
+    "query_params": {
       "ids": "bitcoin,ethereum,solana",
       "vs_currencies": "usd,eur",
       "include_market_cap": "true",
@@ -24,7 +24,7 @@
     "path_params": {
       "id": "ethereum"
     },
-    "params": {
+    "query_params": {
       "contract_addresses": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
       "vs_currencies": "usd"
     }
@@ -38,7 +38,7 @@
     "url": "https://api.coingecko.com/api/v3/coins/list",
     "method": "GET",
     "description": "Get list of all supported coins with ID, name and symbol",
-    "params": {
+    "query_params": {
       "include_platform": "false"
     }
   },
@@ -46,7 +46,7 @@
     "url": "https://api.coingecko.com/api/v3/coins/markets",
     "method": "GET",
     "description": "Get coins with price, market cap, volume and market data",
-    "params": {
+    "query_params": {
       "vs_currency": "usd",
       "order": "market_cap_desc",
       "per_page": "100",
@@ -62,7 +62,7 @@
     "path_params": {
       "id": "bitcoin"
     },
-    "params": {
+    "query_params": {
       "localization": "false",
       "tickers": "false",
       "market_data": "true",
@@ -78,7 +78,7 @@
     "path_params": {
       "id": "bitcoin"
     },
-    "params": {
+    "query_params": {
       "exchange_ids": "",
       "include_exchange_logo": "false",
       "page": "1",
@@ -92,7 +92,7 @@
     "path_params": {
       "id": "bitcoin"
     },
-    "params": {
+    "query_params": {
       "date": "30-12-2023",
       "localization": "false"
     }
@@ -104,7 +104,7 @@
     "path_params": {
       "id": "bitcoin"
     },
-    "params": {
+    "query_params": {
       "vs_currency": "usd",
       "days": "7",
       "interval": "daily"
@@ -117,7 +117,7 @@
     "path_params": {
       "id": "bitcoin"
     },
-    "params": {
+    "query_params": {
       "vs_currency": "usd",
       "from": "1609459200",
       "to": "1640995200"
@@ -130,7 +130,7 @@
     "path_params": {
       "id": "bitcoin"
     },
-    "params": {
+    "query_params": {
       "vs_currency": "usd",
       "days": "7"
     }
@@ -154,7 +154,7 @@
     "url": "https://api.coingecko.com/api/v3/search",
     "method": "GET",
     "description": "Search for coins, categories and markets",
-    "params": {
+    "query_params": {
       "query": "bitcoin"
     }
   },
@@ -162,7 +162,7 @@
     "url": "https://api.coingecko.com/api/v3/exchanges",
     "method": "GET",
     "description": "Get list of exchanges with trading data",
-    "params": {
+    "query_params": {
       "per_page": "100",
       "page": "1"
     }
@@ -179,7 +179,7 @@
     "url": "https://api.coingecko.com/api/v3/coins/categories",
     "method": "GET",
     "description": "Get all coin categories with market data",
-    "params": {
+    "query_params": {
       "order": "market_cap_desc"
     }
   },
@@ -197,7 +197,7 @@
     "url": "https://api.coingecko.com/api/v3/asset_platforms",
     "method": "GET",
     "description": "Get all asset platforms (blockchain networks)",
-    "params": {
+    "query_params": {
       "filter": "nft"
     }
   },
