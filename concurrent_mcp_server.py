@@ -548,6 +548,71 @@ config_manager = None
 session = None
 server = Server("concurrent-config-mcp-server")
 
+# 🔧 FIXED: Add notification handler to prevent validation errors
+async def handle_notification(method: str, params: Optional[Dict] = None) -> None:
+    """Handle MCP notifications (messages without id field)"""
+    try:
+        print(f"📨 INFO: Received notification: {method}")
+        
+        if method == "notifications/initialized":
+            print("✅ INFO: Client initialized notification received")
+            # No action needed for initialized notification
+            return
+        elif method.startswith("notifications/"):
+            print(f"📨 INFO: Notification {method} processed")
+            return
+        else:
+            print(f"⚠️ WARNING: Unknown notification method: {method}")
+            
+    except Exception as e:
+        print(f"❌ ERROR: Error handling notification {method}: {e}")
+        try:
+            from error_logger import log_custom_error
+            log_custom_error("ERROR", "NOTIFICATION_HANDLER_ERROR", "concurrent_mcp_server", 
+                           f"Error handling notification {method}: {e}", e, {
+                               "method": method,
+                               "params": params
+                           })
+        except Exception:
+            pass
+
+# Register notification handlers for all notification types
+async def universal_notification_handler(method: str, params: Optional[Dict] = None) -> None:
+    """Universal handler for all MCP notifications"""
+    try:
+        print(f"📨 INFO: Received notification: {method}")
+        
+        if method == "notifications/initialized":
+            print("✅ INFO: Client initialized notification received")
+            return
+        elif method.startswith("notifications/"):
+            print(f"📨 INFO: Notification {method} processed")
+            return
+        else:
+            print(f"⚠️ WARNING: Unknown notification method: {method}")
+            
+    except Exception as e:
+        print(f"❌ ERROR: Error handling notification {method}: {e}")
+
+# Register all known notification types
+notification_types = [
+    "notifications/initialized",
+    "notifications/progress",
+    "notifications/message",
+    "notifications/log",
+    "notifications/resource_updated",
+    "notifications/prompt_list_changed",
+    "notifications/tool_list_changed"
+]
+
+for notification_type in notification_types:
+    server.notification_handlers[notification_type] = universal_notification_handler
+
+print(f"✅ INFO: Registered {len(notification_types)} notification handlers")
+
+# 🔧 FIXED: Remove custom initialize handler - let MCP Server handle it natively
+print(f"✅ INFO: Using native MCP initialize handling")
+
 @server.list_tools()
 async def handle_list_tools() -> List[Tool]:
     """Thread-safe generation of tools list"""
