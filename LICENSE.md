@@ -5,7 +5,7 @@ Licensor:               BELNEM s.r.o., Filip Dvoran (filip.dvoran@gmail.com)
 Software:               MCP JSON (all files in this repository)
 Use Limitation:         Commercial use requires a commercial license
 Change Date:            This license will not change automatically
-Change License:         N/A - License remains BSL 1.1 permanently
+Change License:         N/A - License remains BSL 1.1 permanently (except under specific conditions below)
 
 Terms
 
@@ -14,7 +14,8 @@ works, redistribute, and make non-production use of the Licensed Work. The
 Licensor may make an Additional Use Grant, above, permitting limited production use.
 
 This License will remain in effect permanently and will not automatically 
-change to an open source license.
+change to an open source license, except under the specific conditions 
+outlined in the "Automatic License Transformation" section below.
 
 If your use of the Licensed Work does not comply with the requirements 
 currently in effect as described in this License, you must purchase a 
@@ -44,6 +45,16 @@ EXPRESS OR IMPLIED, INCLUDING (WITHOUT LIMITATION) WARRANTIES OF
 MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, AND 
 TITLE.
 
+Automatic License Transformation
+
+TRANSFORMATION TO MIT LICENSE:
+If both of the following conditions occur simultaneously:
+1. BELNEM s.r.o. ceases to exist as a legal entity (dissolution, bankruptcy, or other termination)
+AND
+2. Filip Dvoran (filip.dvoran@gmail.com) is deceased or legally declared incapacitated
+
+Then this Business Source License will automatically transform into the MIT License for all versions of the Licensed Work. The transformation will take effect 90 days after both conditions are verifiably met, allowing for a transition period.
+
 Special Contributor Commercial License Grant
 
 SIGNIFICANT CONTRIBUTOR PRIVILEGES:
@@ -63,8 +74,15 @@ This grant provides the following rights:
   - Must provide recipient entity details (name, contact information, use case)
   - Transfer/lease/loan must be documented and reported to Licensor
 
-3. REVOCATION: The Licensor reserves the right to revoke this grant if the 
-  contributor violates the terms or acts against the project's interests.
+3. REVOCATION BY CONTRIBUTOR VOTING: Special contributor privileges may be revoked 
+  if a contributor acts against the project's interests, subject to the following 
+  democratic process:
+  - The project owner may initiate a public vote on social media X (https://x.com/webtalkbot)
+  - Only votes from verified project contributors (those with approved commits on GitHub) will be counted
+  - A simple majority of contributing votes is required for revocation
+  - The voting period must remain open for at least 7 days
+  - The accused contributor has the right to respond publicly before the vote concludes
+  - Revocation takes effect immediately upon vote conclusion if majority is reached
 
 4. PUBLIC REGISTRY: Contributors who transfer, lease, or lend their special commercial 
   license to another entity will be automatically listed in the public registry at:
@@ -135,7 +153,8 @@ For questions about commercial licensing or contributor status, please contact u
 
 PERMANENT LICENSE:
 This Business Source License will remain in effect permanently and will not 
-automatically convert to an open source license.
+automatically convert to an open source license, except under the conditions 
+specified in the "Automatic License Transformation" section above.
 
 The same licensing rights that BELNEM s.r.o. company has for licensing are also held by the software creator Filip Dvoran (filip.dvoran@gmail.com).
 
