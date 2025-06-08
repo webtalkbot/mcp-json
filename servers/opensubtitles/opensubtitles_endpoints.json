@@ -1,0 +1,26 @@
+{
+  "search_subtitles": {
+    "method": "GET",
+    "url": "https://api.opensubtitles.com/api/v1/subtitles",
+    "description": "Search for subtitles by title and language",
+    "query_params": {
+      "query": "{query}",
+      "languages": "{languages}",
+      "page": "{page}"
+    },
+    "timeout": 30
+  },
+  "get_languages": {
+    "method": "GET",
+    "url": "https://api.opensubtitles.com/api/v1/infos/languages",
+    "description": "Get list of supported languages",
+    "timeout": 15
+  },
+  "download_subtitle": {
+    "method": "POST",
+    "url": "https://api.opensubtitles.com/api/v1/download",
+    "description": "Download subtitle file - returns download link",
+    "body_template": "{\"file_id\": {file_id}}",
+    "timeout": 30
+  }
+}

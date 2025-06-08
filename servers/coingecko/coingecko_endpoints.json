@@ -1,0 +1,212 @@
+{
+  "ping": {
+    "url": "https://api.coingecko.com/api/v3/ping",
+    "method": "GET",
+    "description": "Check the API server status"
+  },
+  "get_price": {
+    "url": "https://api.coingecko.com/api/v3/simple/price",
+    "method": "GET",
+    "description": "Get current price of one or more coins in any currency",
+    "params": {
+      "ids": "bitcoin,ethereum,solana",
+      "vs_currencies": "usd,eur",
+      "include_market_cap": "true",
+      "include_24hr_vol": "true",
+      "include_24hr_change": "true",
+      "include_last_updated_at": "true"
+    }
+  },
+  "get_token_price": {
+    "url": "https://api.coingecko.com/api/v3/simple/token_price/{id}",
+    "method": "GET",
+    "description": "Get price of tokens by contract address",
+    "path_params": {
+      "id": "ethereum"
+    },
+    "params": {
+      "contract_addresses": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "vs_currencies": "usd"
+    }
+  },
+  "get_supported_currencies": {
+    "url": "https://api.coingecko.com/api/v3/simple/supported_vs_currencies",
+    "method": "GET",
+    "description": "Get list of all supported currencies"
+  },
+  "get_coins_list": {
+    "url": "https://api.coingecko.com/api/v3/coins/list",
+    "method": "GET",
+    "description": "Get list of all supported coins with ID, name and symbol",
+    "params": {
+      "include_platform": "false"
+    }
+  },
+  "get_coins_markets": {
+    "url": "https://api.coingecko.com/api/v3/coins/markets",
+    "method": "GET",
+    "description": "Get coins with price, market cap, volume and market data",
+    "params": {
+      "vs_currency": "usd",
+      "order": "market_cap_desc",
+      "per_page": "100",
+      "page": "1",
+      "sparkline": "false",
+      "locale": "en"
+    }
+  },
+  "get_coin_details": {
+    "url": "https://api.coingecko.com/api/v3/coins/{id}",
+    "method": "GET",
+    "description": "Get all metadata for a specific coin",
+    "path_params": {
+      "id": "bitcoin"
+    },
+    "params": {
+      "localization": "false",
+      "tickers": "false",
+      "market_data": "true",
+      "community_data": "false",
+      "developer_data": "false",
+      "sparkline": "false"
+    }
+  },
+  "get_coin_tickers": {
+    "url": "https://api.coingecko.com/api/v3/coins/{id}/tickers",
+    "method": "GET",
+    "description": "Get coin tickers on CEX and DEX exchanges",
+    "path_params": {
+      "id": "bitcoin"
+    },
+    "params": {
+      "exchange_ids": "",
+      "include_exchange_logo": "false",
+      "page": "1",
+      "order": "trust_score_desc"
+    }
+  },
+  "get_coin_history": {
+    "url": "https://api.coingecko.com/api/v3/coins/{id}/history",
+    "method": "GET",
+    "description": "Get historical data for a coin at a specific date",
+    "path_params": {
+      "id": "bitcoin"
+    },
+    "params": {
+      "date": "30-12-2023",
+      "localization": "false"
+    }
+  },
+  "get_coin_market_chart": {
+    "url": "https://api.coingecko.com/api/v3/coins/{id}/market_chart",
+    "method": "GET",
+    "description": "Get historical chart data (price, market cap, volume)",
+    "path_params": {
+      "id": "bitcoin"
+    },
+    "params": {
+      "vs_currency": "usd",
+      "days": "7",
+      "interval": "daily"
+    }
+  },
+  "get_coin_market_chart_range": {
+    "url": "https://api.coingecko.com/api/v3/coins/{id}/market_chart/range",
+    "method": "GET",
+    "description": "Get historical chart data within time range",
+    "path_params": {
+      "id": "bitcoin"
+    },
+    "params": {
+      "vs_currency": "usd",
+      "from": "1609459200",
+      "to": "1640995200"
+    }
+  },
+  "get_coin_ohlc": {
+    "url": "https://api.coingecko.com/api/v3/coins/{id}/ohlc",
+    "method": "GET",
+    "description": "Get OHLC (Open, High, Low, Close) data",
+    "path_params": {
+      "id": "bitcoin"
+    },
+    "params": {
+      "vs_currency": "usd",
+      "days": "7"
+    }
+  },
+  "get_trending": {
+    "url": "https://api.coingecko.com/api/v3/search/trending",
+    "method": "GET",
+    "description": "Get trending coins, NFTs and categories in last 24h"
+  },
+  "get_global_data": {
+    "url": "https://api.coingecko.com/api/v3/global",
+    "method": "GET",
+    "description": "Get cryptocurrency global market data"
+  },
+  "get_global_defi": {
+    "url": "https://api.coingecko.com/api/v3/global/decentralized_finance_defi",
+    "method": "GET",
+    "description": "Get global DeFi market data"
+  },
+  "search": {
+    "url": "https://api.coingecko.com/api/v3/search",
+    "method": "GET",
+    "description": "Search for coins, categories and markets",
+    "params": {
+      "query": "bitcoin"
+    }
+  },
+  "get_exchanges": {
+    "url": "https://api.coingecko.com/api/v3/exchanges",
+    "method": "GET",
+    "description": "Get list of exchanges with trading data",
+    "params": {
+      "per_page": "100",
+      "page": "1"
+    }
+  },
+  "get_exchange_details": {
+    "url": "https://api.coingecko.com/api/v3/exchanges/{id}",
+    "method": "GET",
+    "description": "Get exchange data by exchange ID",
+    "path_params": {
+      "id": "binance"
+    }
+  },
+  "get_categories": {
+    "url": "https://api.coingecko.com/api/v3/coins/categories",
+    "method": "GET",
+    "description": "Get all coin categories with market data",
+    "params": {
+      "order": "market_cap_desc"
+    }
+  },
+  "get_categories_list": {
+    "url": "https://api.coingecko.com/api/v3/coins/categories/list",
+    "method": "GET",
+    "description": "Get list of all coin categories"
+  },
+  "get_exchange_rates": {
+    "url": "https://api.coingecko.com/api/v3/exchange_rates",
+    "method": "GET",
+    "description": "Get BTC exchange rates with other currencies"
+  },
+  "get_asset_platforms": {
+    "url": "https://api.coingecko.com/api/v3/asset_platforms",
+    "method": "GET",
+    "description": "Get all asset platforms (blockchain networks)",
+    "params": {
+      "filter": "nft"
+    }
+  },
+  "get_companies_holdings": {
+    "url": "https://api.coingecko.com/api/v3/companies/public_treasury/{coin_id}",
+    "method": "GET",
+    "description": "Get public companies' crypto holdings",
+    "path_params": {
+      "coin_id": "bitcoin"
+    }
+  }
+}
