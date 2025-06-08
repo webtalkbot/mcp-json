@@ -1,8 +1,8 @@
 Business Source License 1.1
 
-Licensed Work:          MCPJSON - MCP JSON Server Manager
-Licensor:               BELNEM s.r.o. (webtalkbot.com)
-Software:               MCPJSON (all files in this repository)
+Licensed Work:          MCP JSON - MCP JSON Server Manager
+Licensor:               BELNEM s.r.o. (webtalkbot.com), Filip Dvoran (filip.dvoran@gmail.com)
+Software:               MCP JSON (all files in this repository)
 Use Limitation:         Commercial use requires a commercial license
 Change Date:            This license will not change automatically
 Change License:         N/A - License remains BSL 1.1 permanently
@@ -68,7 +68,7 @@ This grant provides the following rights:
 
 4. PUBLIC REGISTRY: Contributors who transfer, lease, or lend their commercial 
   license to another entity will be automatically listed in the public registry at:
-  https://github.com/webtalkbot/mcpjson/tree/main/enterprise
+  https://github.com/webtalkbot/mcp-json/tree/main/enterprise
 
 SIGNIFICANT CONTRIBUTION CRITERIA:
 The determination of "significant contribution" is at the sole discretion of 
@@ -104,8 +104,8 @@ NON-COMMERCIAL USE PERMITTED:
 COMMERCIAL LICENSE REQUIRED:
 To use this software for commercial purposes, you must either:
 1. Obtain a commercial license by contacting:
-  Email: mcpjson@webtalkbot.com
-  Website: mcpjson.org
+  Email: license@mcp-json.com
+  Website: mcp-json.com
   Organization: BELNEM s.r.o. (webtalkbot.com)
 
   Commercial License Pricing (based on annual revenue):
@@ -123,7 +123,7 @@ To use this software for commercial purposes, you must either:
 
 ENTERPRISE REGISTRY:
 The following entities will be listed in the public registry at:
-https://github.com/webtalkbot/mcpjson/tree/main/enterprise
+https://github.com/webtalkbot/mcp-json/tree/main/enterprise
 
 - Contributors who transfer, lease, or lend their commercial license (mandatory)
 - Newly incorporated companies with $9 USD startup license (mandatory)
@@ -134,5 +134,7 @@ For questions about commercial licensing or contributor status, please contact u
 PERMANENT LICENSE:
 This Business Source License will remain in effect permanently and will not 
 automatically convert to an open source license.
+
+The same licensing rights that BELNEM s.r.o. company has for licensing are also held by the software creator Filip Dvoran (filip.dvoran@gmail.com).
 
 Copyright (c) 2025 Webtalkbot. All rights reserved.
