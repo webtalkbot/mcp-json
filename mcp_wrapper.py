@@ -782,6 +782,115 @@ class StreamableSessionManager:
 # Global Streamable session manager
 streamable_manager = StreamableSessionManager()
 
+# 🆕 NEW: MCP Session Manager for proper session handling
+class MCPSessionManager:
+    """Manager for MCP protocol sessions with proper Mcp-Session-Id header support"""
+    
+    def __init__(self):
+        self.sessions: Dict[str, Dict] = {}
+        self.lock = asyncio.Lock()
+        self.session_timeout = 3600  # 1 hour timeout
+    
+    async def create_session(self, client_info: Dict = None) -> str:
+        """Creates a new MCP session and returns session ID"""
+        session_id = str(uuid.uuid4())
+        async with self.lock:
+            self.sessions[session_id] = {
+                "session_id": session_id,
+                "client_info": client_info or {},
+                "created_at": time.time(),
+                "last_activity": time.time(),
+                "request_count": 0,
+                "initialized": True
+            }
+        logger.info(f"MCP Session: Created session {session_id} for client {client_info.get('name', 'unknown')}")
+        return session_id
+    
+    async def validate_session(self, session_id: str) -> bool:
+        """Validates if session exists and is not expired"""
+        if not session_id:
+            return False
+        
+        async with self.lock:
+            session = self.sessions.get(session_id)
+            if not session:
+                return False
+            
+            # Check timeout
+            if time.time() - session["last_activity"] > self.session_timeout:
+                del self.sessions[session_id]
+                logger.info(f"MCP Session: Expired session {session_id}")
+                return False
+            
+            return True
+    
+    async def update_session_activity(self, session_id: str):
+        """Updates last activity timestamp for session"""
+        async with self.lock:
+            if session_id in self.sessions:
+                self.sessions[session_id]["last_activity"] = time.time()
+                self.sessions[session_id]["request_count"] += 1
+    
+    async def get_session_info(self, session_id: str) -> Optional[Dict]:
+        """Gets session information"""
+        async with self.lock:
+            return self.sessions.get(session_id)
+    
+    async def remove_session(self, session_id: str):
+        """Removes a session"""
+        async with self.lock:
+            if session_id in self.sessions:
+                del self.sessions[session_id]
+                logger.info(f"MCP Session: Removed session {session_id}")
+    
+    async def cleanup_expired_sessions(self):
+        """Removes expired sessions"""
+        current_time = time.time()
+        expired_sessions = []
+        
+        async with self.lock:
+            for session_id, session in self.sessions.items():
+                if current_time - session["last_activity"] > self.session_timeout:
+                    expired_sessions.append(session_id)
+        
+        for session_id in expired_sessions:
+            await self.remove_session(session_id)
+        
+        if expired_sessions:
+            logger.info(f"MCP Session: Cleaned up {len(expired_sessions)} expired sessions")
+    
+    def get_stats(self) -> Dict:
+        """Returns session statistics"""
+        with self.lock:
+            return {
+                "total_sessions": len(self.sessions),
+                "active_sessions": len(self.sessions),
+                "session_timeout": self.session_timeout
+            }
+
+# Global MCP session manager
+mcp_session_manager = MCPSessionManager()
+
+# 🆕 NEW: Helper functions for session management
+async def _store_mcp_session(session_id: str, client_info: Dict):
+    """Stores MCP session information"""
+    try:
+        # Session already created, just update client info
+        session = await mcp_session_manager.get_session_info(session_id)
+        if session:
+            session["client_info"] = client_info
+            logger.info(f"MCP Session: Updated client info for session {session_id}")
+    except Exception as e:
+        logger.error(f"MCP Session: Error storing session {session_id}: {e}")
+
+async def _validate_mcp_session(session_id: str) -> bool:
+    """Validates MCP session"""
+    return await mcp_session_manager.validate_session(session_id)
+
+async def _update_session_activity(session_id: str):
+    """Updates session activity"""
+    await mcp_session_manager.update_session_activity(session_id)
+
 # FastAPI Events
 @app.on_event("startup")
 async def startup_event():
@@ -1100,10 +1209,10 @@ async def mcp_standard_get(request: Request):
     )
 
 @app.post("/mcp")
-async def mcp_standard_post(request_data: dict):
+async def mcp_standard_post(request_data: dict, request: Request):
     """
-    🆕 NEW: Standard MCP endpoint - JSON-RPC communication for request/response
-    MCP Protocol 2025-03-26 compliant - POST method provides JSON-RPC interface
+    🆕 FIXED: Standard MCP endpoint with proper session management
+    MCP Protocol 2025-03-26 compliant with Mcp-Session-Id header support
     """
     logger.info("MCP Standard: New POST request on /mcp")
     
@@ -1114,7 +1223,10 @@ async def mcp_standard_post(request_data: dict):
         request_id = request_data.get("id")
         jsonrpc = request_data.get("jsonrpc")
         
-        logger.info(f"MCP Standard POST: {method} with ID {request_id}")
+        # 🆕 NEW: Extract session ID from headers
+        session_id = request.headers.get("Mcp-Session-Id")
+        
+        logger.info(f"MCP Standard POST: {method} with ID {request_id}, Session: {session_id}")
         
         # Validate JSON-RPC 2.0 format
         if jsonrpc != "2.0":
@@ -1139,13 +1251,22 @@ async def mcp_standard_post(request_data: dict):
         
         # Handle standard MCP methods
         if method == "initialize":
-            # MCP initialize handshake
+            # 🆕 NEW: Generate session ID for new clients
+            if not session_id:
+                session_id = await mcp_session_manager.create_session()
+                logger.info(f"MCP Standard: Generated new session ID: {session_id}")
+            
+            # MCP initialize handshake with session management
             client_capabilities = params.get("capabilities", {}) if params else {}
             client_info = params.get("clientInfo", {}) if params else {}
             
-            logger.info(f"MCP Standard: Initialize from client {client_info.get('name', 'unknown')}")
+            # 🆕 NEW: Store session info
+            await _store_mcp_session(session_id, client_info)
             
-            return {
+            logger.info(f"MCP Standard: Initialize from client {client_info.get('name', 'unknown')} with session {session_id}")
+            
+            # 🆕 NEW: Return response with session header
+            response = {
                 "jsonrpc": "2.0",
                 "id": request_id,
                 "result": {
@@ -1154,14 +1275,50 @@ async def mcp_standard_post(request_data: dict):
                         "tools": True,
                         "resources": True,
                         "prompts": False,
-                        "logging": True
+                        "logging": True,
+                        "session_management": True  # NEW: Indicate session support
                     },
                     "serverInfo": {
                         "name": "mcp-server-manager",
                         "version": "1.0.0"
-                    }
+                    },
+                    "sessionId": session_id  # NEW: Include session ID in response
                 }
             }
+            
+            # 🆕 NEW: Add session header to response
+            from fastapi import Response
+            from fastapi.responses import JSONResponse
+            json_response = JSONResponse(content=response)
+            json_response.headers["Mcp-Session-Id"] = session_id
+            return json_response
+        
+        # 🆕 NEW: Validate session for all non-initialize requests
+        if method != "initialize":
+            if not session_id:
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {
+                        "code": -32602,
+                        "message": "Missing Mcp-Session-Id header - session required"
+                    }
+                }
+            
+            # Validate session exists
+            session_valid = await _validate_mcp_session(session_id)
+            if not session_valid:
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {
+                        "code": -32001,
+                        "message": f"Invalid or expired session: {session_id}"
+                    }
+                }
+            
+            # Update session activity
+            await _update_session_activity(session_id)
         
         elif method == "capabilities":
             # Return aggregated capabilities from all servers
@@ -1173,7 +1330,8 @@ async def mcp_standard_post(request_data: dict):
                         "tools": True,
                         "resources": True,
                         "prompts": False,
-                        "logging": True
+                        "logging": True,
+                        "session_management": True  # NEW: Include session support
                     },
                     "protocolVersion": "2025-03-26",
                     "serverInfo": {
@@ -2162,6 +2320,9 @@ async def health_check():
         servers = db.list_servers()
         running_count = len([s for s in servers if s['status'] == 'running'])
         
+        # 🆕 NEW: Include session management stats
+        session_stats = mcp_session_manager.get_stats()
+        
         return {
             "status": "healthy",
             "servers_total": len(servers),
@@ -2169,11 +2330,44 @@ async def health_check():
             "timestamp": time.time(),
             "individual_mcp_endpoints": "enabled",
             "sse_transport": "enabled",
-            "process_monitoring": process_manager._monitor_task is not None
+            "process_monitoring": process_manager._monitor_task is not None,
+            "session_management": {
+                "enabled": True,
+                "active_sessions": session_stats["active_sessions"],
+                "session_timeout": session_stats["session_timeout"]
+            }
         }
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         raise HTTPException(status_code=500, detail="Health check failed")
+
+# 🆕 NEW: MCP Session Management Endpoints
+@app.get("/mcp/sessions")
+async def get_session_stats():
+    """Get MCP session statistics"""
+    try:
+        stats = mcp_session_manager.get_stats()
+        return {
+            "session_stats": stats,
+            "description": "MCP session management statistics"
+        }
+    except Exception as e:
+        logger.error(f"Error getting session stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/mcp/sessions/cleanup")
+async def cleanup_expired_sessions():
+    """Manually trigger cleanup of expired sessions"""
+    try:
+        await mcp_session_manager.cleanup_expired_sessions()
+        stats = mcp_session_manager.get_stats()
+        return {
+            "message": "Expired sessions cleaned up",
+            "session_stats": stats
+        }
+    except Exception as e:
+        logger.error(f"Error cleaning up sessions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Explicitly disabled endpoints for security
 @app.post("/servers")
