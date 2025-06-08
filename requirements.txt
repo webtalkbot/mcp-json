@@ -10,3 +10,4 @@ aiofiles
 pydantic
 python-dotenv
 pytest
+pytest-asyncio
