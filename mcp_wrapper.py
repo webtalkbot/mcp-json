@@ -1462,7 +1462,7 @@ async def streamable_mcp_transport_get(server_name: str, request: Request):
                         "message": f"Initialization error: {str(e)}"
                     }
                 }
-                yield json.dumps(error_response) + '\n'
+                yield f"data: {json.dumps(error_response)}\n\n"
                 return
             
             # Main Streamable communication loop
@@ -1486,8 +1486,8 @@ async def streamable_mcp_transport_get(server_name: str, request: Request):
                     
                     if message:
                         try:
-                            # Send message to client in Streamable HTTP format (JSON per line)
-                            yield json.dumps(message) + '\n'
+                            # Send message to client in proper SSE format
+                            yield f"data: {json.dumps(message)}\n\n"
                         except Exception as e:
                             logger.error(f"Streamable: Error sending message to client: {e}")
                             break
@@ -1768,8 +1768,8 @@ async def global_streamable_endpoint(request: Request):
                 ]
             }
             
-            # Streamable format - JSON per line
-            yield json.dumps(discovery_message) + '\n'
+            # Proper SSE format
+            yield f"data: {json.dumps(discovery_message)}\n\n"
             
             # Heartbeat loop (optional for streamable)
             while True:
@@ -1785,7 +1785,7 @@ async def global_streamable_endpoint(request: Request):
                 "type": "error", 
                 "message": str(e)
             }
-            yield json.dumps(error_response) + '\n'
+            yield f"data: {json.dumps(error_response)}\n\n"
     
     return StreamingResponse(
         streamable_event_stream(),
