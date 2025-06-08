@@ -1542,7 +1542,7 @@ async def streamable_mcp_transport_get(server_name: str, request: Request):
     
     return StreamingResponse(
         streamable_event_stream(),
-        media_type="application/json",
+        media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
@@ -1789,7 +1789,7 @@ async def global_streamable_endpoint(request: Request):
     
     return StreamingResponse(
         streamable_event_stream(),
-        media_type="application/json",
+        media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
