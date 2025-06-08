@@ -608,7 +608,7 @@ async def handle_list_tools() -> List[Tool]:
                 
         print(f"📋 INFO: Basic tools created: {len(tools)}")
         
-        # Dynamic tools for each server and endpoint
+        # 🔧 FIXED: Dynamic tools for each server and endpoint with better error handling
         available_servers = []
         try:
             print("📋 INFO: Attempting to discover servers...")
@@ -616,6 +616,8 @@ async def handle_list_tools() -> List[Tool]:
             print(f"📋 INFO: Found servers: {available_servers}")
         except Exception as e:
             print(f"❌ ERROR: Error discovering servers: {e}")
+            import traceback
+            print(f"❌ ERROR: Traceback: {traceback.format_exc()}")
             return tools
         
         for server_name in available_servers:
@@ -624,6 +626,11 @@ async def handle_list_tools() -> List[Tool]:
                 print(f"📋 INFO: Loading endpoints for server {server_name}")
                 endpoints = await config_manager.get_all_endpoints_for_server(server_name)                
                 print(f"📋 INFO: Server {server_name} has endpoints: {list(endpoints.keys())}")
+                
+                # 🔧 FIXED: Safe iteration over endpoints
+                if not isinstance(endpoints, dict):
+                    print(f"❌ ERROR: Endpoints for {server_name} is not dict: {type(endpoints)}")
+                    continue
                 
                 for endpoint_name, endpoint_config in endpoints.items():                    
                     print(f"📋 INFO: Creating tool for endpoint {endpoint_name}")
@@ -635,6 +642,11 @@ async def handle_list_tools() -> List[Tool]:
                         method = endpoint_config.get("method", "GET")
                         url = endpoint_config.get("url", "")
                         description = endpoint_config.get("description", f"{method} {url}")
+                        
+                        # 🔧 FIXED: Validate critical fields
+                        if not method or not url:
+                            print(f"❌ ERROR: Missing method or URL for endpoint {endpoint_name}")
+                            continue
                         
                         # Creates schema for tool
                         tool_schema = {
@@ -657,20 +669,33 @@ async def handle_list_tools() -> List[Tool]:
                                 "default": {}
                             }
                         
+                        # 🔧 FIXED: Safe tool creation with validation
+                        tool_name = f"{server_name}__{endpoint_name}"
+                        tool_description = f"[{server_name}] {description}"
+                        
+                        # Validate tool name and description
+                        if not tool_name or not tool_description:
+                            print(f"❌ ERROR: Invalid tool name or description for {endpoint_name}")
+                            continue
+                        
                         tool = Tool(
-                            name=f"{server_name}__{endpoint_name}",
-                            description=f"[{server_name}] {description}",
+                            name=tool_name,
+                            description=tool_description,
                             inputSchema=tool_schema
                         )
                         tools.append(tool)                        
-                        print(f"📋 INFO: Tool {server_name}__{endpoint_name} created")
+                        print(f"📋 INFO: Tool {tool_name} created successfully")
                         
                     except Exception as e:                        
                         print(f"❌ ERROR: Error creating tool for endpoint {endpoint_name} in server {server_name}: {e}")
+                        import traceback
+                        print(f"❌ ERROR: Tool creation traceback: {traceback.format_exc()}")
                         continue
                         
             except Exception as e:
                 print(f"❌ ERROR: Error loading endpoints for server {server_name}: {e}")
+                import traceback
+                print(f"❌ ERROR: Server processing traceback: {traceback.format_exc()}")
                 continue
         
         print(f"📋 INFO: Total tools created: {len(tools)}")
