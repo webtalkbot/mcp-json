@@ -980,9 +980,322 @@ async def mcp_discovery():
     }
 
 @app.get("/mcp")
-async def mcp_root():
-    """Alternative MCP root endpoint"""
-    return await mcp_discovery()
+async def mcp_standard_get(request: Request):
+    """
+    🆕 FIXED: Standard MCP endpoint - SSE stream for real-time communication
+    MCP Protocol 2025-03-26 compliant - GET method provides SSE stream
+    """
+    logger.info("MCP Standard: New SSE connection on /mcp")
+    
+    async def mcp_sse_stream():
+        try:
+            # Send initial capabilities and discovery
+            servers = db.list_servers()
+            running_servers = [s for s in servers if s['status'] == 'running']
+            
+            # MCP 2025-03-26 compliant initialize response
+            init_response = {
+                "jsonrpc": "2.0",
+                "id": 0,
+                "result": {
+                    "protocolVersion": "2025-03-26",
+                    "capabilities": {
+                        "tools": True,
+                        "resources": True,
+                        "prompts": False,
+                        "logging": True
+                    },
+                    "serverInfo": {
+                        "name": "mcp-server-manager",
+                        "version": "1.0.0"
+                    },
+                    "implementation": {
+                        "name": "mcp-server-manager",
+                        "version": "1.0.0",
+                        "description": "Universal MCP wrapper supporting REST API and Streamable HTTP transport"
+                    },
+                    "servers": [
+                        {
+                            "name": server['name'],
+                            "description": server.get('description', f"MCP Server {server['name']}"),
+                            "status": "running",
+                            "endpoints": {
+                                "streamable": f"/servers/{server['name']}/streamable",
+                                "tools_list": f"/servers/{server['name']}/mcp/tools/list",
+                                "tools_call": f"/servers/{server['name']}/mcp/tools/call"
+                            }
+                        }
+                        for server in running_servers
+                    ]
+                }
+            }
+            
+            yield f"data: {json.dumps(init_response)}\n\n"
+            
+            # Real-time updates loop
+            while True:
+                try:
+                    # Check if client is still connected
+                    if await request.is_disconnected():
+                        logger.info("MCP Standard: Client disconnected from /mcp SSE")
+                        break
+                    
+                    # Send periodic server status updates
+                    current_servers = db.list_servers()
+                    current_running = [s for s in current_servers if s['status'] == 'running']
+                    
+                    status_update = {
+                        "jsonrpc": "2.0",
+                        "method": "notifications/server_status",
+                        "params": {
+                            "timestamp": time.time(),
+                            "servers_total": len(current_servers),
+                            "servers_running": len(current_running),
+                            "running_servers": [server['name'] for server in current_running]
+                        }
+                    }
+                    
+                    yield f"data: {json.dumps(status_update)}\n\n"
+                    
+                    # Wait before next update
+                    await asyncio.sleep(30)  # Update every 30 seconds
+                    
+                except asyncio.CancelledError:
+                    logger.debug("MCP Standard: SSE stream was cancelled")
+                    break
+                except Exception as e:
+                    logger.warning(f"MCP Standard: Error in SSE loop: {e}")
+                    await asyncio.sleep(5)
+                    
+        except asyncio.CancelledError:
+            logger.debug("MCP Standard: SSE stream was cancelled")
+        except Exception as e:
+            logger.error(f"MCP Standard: Critical error in SSE stream: {e}")
+            error_response = {
+                "jsonrpc": "2.0",
+                "error": {
+                    "code": -32000,
+                    "message": f"SSE stream error: {str(e)}"
+                }
+            }
+            try:
+                yield f"data: {json.dumps(error_response)}\n\n"
+            except Exception:
+                pass  # Stream already corrupted
+        
+        finally:
+            logger.info("MCP Standard: SSE stream closed")
+    
+    return StreamingResponse(
+        mcp_sse_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Transfer-Encoding": "chunked",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        }
+    )
+
+@app.post("/mcp")
+async def mcp_standard_post(request_data: dict):
+    """
+    🆕 NEW: Standard MCP endpoint - JSON-RPC communication for request/response
+    MCP Protocol 2025-03-26 compliant - POST method provides JSON-RPC interface
+    """
+    logger.info("MCP Standard: New POST request on /mcp")
+    
+    try:
+        # Validate JSON-RPC request structure
+        method = request_data.get("method")
+        params = request_data.get("params")
+        request_id = request_data.get("id")
+        jsonrpc = request_data.get("jsonrpc")
+        
+        logger.info(f"MCP Standard POST: {method} with ID {request_id}")
+        
+        # Validate JSON-RPC 2.0 format
+        if jsonrpc != "2.0":
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "error": {
+                    "code": -32600,
+                    "message": "Invalid Request - must be JSON-RPC 2.0"
+                }
+            }
+        
+        if not method:
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "error": {
+                    "code": -32600,
+                    "message": "Invalid Request - missing method"
+                }
+            }
+        
+        # Handle standard MCP methods
+        if method == "initialize":
+            # MCP initialize handshake
+            client_capabilities = params.get("capabilities", {}) if params else {}
+            client_info = params.get("clientInfo", {}) if params else {}
+            
+            logger.info(f"MCP Standard: Initialize from client {client_info.get('name', 'unknown')}")
+            
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {
+                    "protocolVersion": "2025-03-26",
+                    "capabilities": {
+                        "tools": True,
+                        "resources": True,
+                        "prompts": False,
+                        "logging": True
+                    },
+                    "serverInfo": {
+                        "name": "mcp-server-manager",
+                        "version": "1.0.0"
+                    }
+                }
+            }
+        
+        elif method == "capabilities":
+            # Return aggregated capabilities from all servers
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {
+                    "capabilities": {
+                        "tools": True,
+                        "resources": True,
+                        "prompts": False,
+                        "logging": True
+                    },
+                    "protocolVersion": "2025-03-26",
+                    "serverInfo": {
+                        "name": "mcp-server-manager",
+                        "version": "1.0.0"
+                    }
+                }
+            }
+        
+        elif method == "tools/list":
+            # Delegate to global tools proxy
+            try:
+                aggregated_tools = await tools_proxy.get_all_tools()
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "result": {
+                        "tools": aggregated_tools
+                    }
+                }
+            except Exception as e:
+                logger.error(f"MCP Standard: Error getting tools: {e}")
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {
+                        "code": -32000,
+                        "message": f"Failed to get tools: {str(e)}"
+                    }
+                }
+        
+        elif method == "tools/call":
+            # Delegate to global tools proxy
+            try:
+                tool_name = params.get("name") if params else None
+                arguments = params.get("arguments", {}) if params else {}
+                
+                if not tool_name:
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "error": {
+                            "code": -32602,
+                            "message": "Invalid params - missing tool name"
+                        }
+                    }
+                
+                logger.info(f"MCP Standard: Calling tool {tool_name}")
+                
+                # Use tools proxy for routing
+                response = await tools_proxy.call_tool(tool_name, arguments)
+                
+                # Check if it's an error response from tools proxy
+                if "error" in response:
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "error": response["error"]
+                    }
+                elif "result" in response:
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "result": response["result"]
+                    }
+                else:
+                    return {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "error": {
+                            "code": -32000,
+                            "message": "Unexpected response format from tool proxy"
+                        }
+                    }
+                    
+            except Exception as e:
+                logger.error(f"MCP Standard: Error calling tool: {e}")
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {
+                        "code": -32000,
+                        "message": f"Tool call failed: {str(e)}"
+                    }
+                }
+        
+        elif method == "resources/list":
+            # Resources are not globally aggregated, return empty list
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {
+                    "resources": []
+                }
+            }
+        
+        elif method.startswith("notifications/"):
+            # Handle MCP notifications (no response needed)
+            logger.info(f"MCP Standard: Received notification {method}")
+            return None  # Notifications don't get responses
+        
+        else:
+            # Method not found
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "error": {
+                    "code": -32601,
+                    "message": f"Method not found: {method}"
+                }
+            }
+    
+    except Exception as e:
+        logger.error(f"MCP Standard: Error processing POST request: {e}")
+        return {
+            "jsonrpc": "2.0",
+            "id": request_data.get("id") if isinstance(request_data, dict) else None,
+            "error": {
+                "code": -32000,
+                "message": f"Internal error: {str(e)}"
+            }
+        }
 
 @app.get("/mcp/capabilities")
 async def mcp_global_capabilities():
