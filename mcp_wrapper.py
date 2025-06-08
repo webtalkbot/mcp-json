@@ -217,15 +217,17 @@ class MCPProcess:
                 
                 # FIXED: Only send initialized notification after receiving response
                 if initialization_response_received and not initialized_sent:
+                    # FIXED: Notifications MUST NOT have 'id' field according to MCP protocol
                     initialized_notification = {
                         "jsonrpc": "2.0",
                         "method": "notifications/initialized"
+                        # NO 'id' field for notifications!
                     }
                     
                     self.process.stdin.write(json.dumps(initialized_notification) + '\n')
                     self.process.stdin.flush()
                     initialized_sent = True
-                    logger.info(f"✅ Sent MCP initialized notification for server {self.name}")
+                    logger.info(f"✅ Sent MCP initialized notification for server {self.name} (without ID - correct protocol)")
                     
                     # FIXED: Server is now fully ready for tool calls
                     logger.info(f"🎉 MCP handshake complete for server {self.name} - ready for tool calls")

@@ -1067,15 +1067,38 @@ async def main():
                         except Exception as e:
                             error_msg = f"MCP server.run() failed: {e}"
                             print(f"❌ ERROR: {error_msg}")
-                            try:
-                                from error_logger import log_custom_error
-                                log_custom_error("CRITICAL", "SERVER_RUN_ERROR", "concurrent_mcp_server", 
-                                               error_msg, e, {
-                                                   "server_name": "concurrent-config-mcp-server",
-                                                   "protocol_version": "2024-11-05"
-                                               })
-                            except Exception:
-                                pass
+                            
+                            # Check if this is the notifications/initialized validation error
+                            if "notifications/initialized" in str(e) and "ValidationError" in str(e):
+                                print(f"🔧 DETECTED: MCP protocol validation error with notifications/initialized")
+                                print(f"🔧 REASON: Notification messages should not have 'id' field")
+                                
+                                try:
+                                    from error_logger import log_custom_error
+                                    log_custom_error("CRITICAL", "MCP_NOTIFICATION_PROTOCOL_ERROR", "concurrent_mcp_server", 
+                                                   "MCP protocol error: notifications/initialized sent with ID field, but notifications must not have ID", 
+                                                   e, {
+                                                       "server_name": "concurrent-config-mcp-server",
+                                                       "protocol_version": "2024-11-05",
+                                                       "fix_needed": "Remove 'id' field from notification messages",
+                                                       "mcp_spec": "Notifications must not contain 'id' field according to MCP protocol"
+                                                   })
+                                except Exception:
+                                    pass
+                                    
+                                print(f"🔧 BUG IDENTIFIED: The concurrent_mcp_server.py is running as standalone MCP server")
+                                print(f"🔧 SOLUTION: This server should NOT be run directly, it's meant to be called by mcp_wrapper.py")
+                                print(f"🔧 ACTION NEEDED: Fix the script to prevent direct execution or fix MCP protocol compliance")
+                            else:
+                                try:
+                                    from error_logger import log_custom_error
+                                    log_custom_error("CRITICAL", "SERVER_RUN_ERROR", "concurrent_mcp_server", 
+                                                   error_msg, e, {
+                                                       "server_name": "concurrent-config-mcp-server",
+                                                       "protocol_version": "2024-11-05"
+                                                   })
+                                except Exception:
+                                    pass
                             raise
                             
                 except Exception as e:
