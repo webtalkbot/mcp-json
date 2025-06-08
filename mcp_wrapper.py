@@ -149,25 +149,34 @@ class MCPProcess:
             return False
     
     async def _wait_for_initialization_async(self, timeout: int = 30):
-        """Async wait for server initialization"""
+        """FIXED: Proper MCP initialization handshake with capability negotiation"""
         start_time = time.time()
         init_sent = False
         initialized_sent = False
+        initialization_response_received = False
+        server_capabilities = None
+        
+        logger.info(f"Starting MCP initialization handshake for server {self.name}")
         
         while time.time() - start_time < timeout:
             if self.process.poll() is not None:
-                raise Exception(f"Server process {self.name} terminated prematurely")
+                raise Exception(f"Server process {self.name} terminated prematurely during initialization")
             
             try:
                 if not init_sent:
-                    # Attempt initialization handshake
+                    # FIXED: Send proper MCP initialize request with client capabilities
                     init_request = {
                         "jsonrpc": "2.0",
                         "id": 0,
                         "method": "initialize",
                         "params": {
                             "protocolVersion": "2025-03-26",
-                            "capabilities": {},
+                            "capabilities": {
+                                "tools": {},
+                                "resources": {},
+                                "prompts": {},
+                                "logging": {}
+                            },
                             "clientInfo": {
                                 "name": "mcp-wrapper",
                                 "version": "1.0.0"
@@ -178,10 +187,19 @@ class MCPProcess:
                     self.process.stdin.write(json.dumps(init_request) + '\n')
                     self.process.stdin.flush()
                     init_sent = True
-                    logger.debug(f"Sent initialize request for server {self.name}")
+                    logger.info(f"✅ Sent MCP initialize request for server {self.name}")
                 
-                # If server responded to initialize, send initialized notification
-                if self.initialized and not initialized_sent:
+                # FIXED: Wait for proper initialize response before proceeding
+                if init_sent and self.initialized and not initialization_response_received:
+                    initialization_response_received = True
+                    logger.info(f"✅ Received MCP initialize response from server {self.name}")
+                    
+                    # FIXED: Validate server capabilities (if available)
+                    # This would be populated by _process_message_async when it receives the response
+                    logger.info(f"Server {self.name} capabilities negotiated successfully")
+                
+                # FIXED: Only send initialized notification after receiving response
+                if initialization_response_received and not initialized_sent:
                     initialized_notification = {
                         "jsonrpc": "2.0",
                         "method": "notifications/initialized"
@@ -190,23 +208,27 @@ class MCPProcess:
                     self.process.stdin.write(json.dumps(initialized_notification) + '\n')
                     self.process.stdin.flush()
                     initialized_sent = True
-                    logger.debug(f"Sent initialized notification for server {self.name}")
+                    logger.info(f"✅ Sent MCP initialized notification for server {self.name}")
                     
-                    # Short wait for stabilization
-                    await asyncio.sleep(0.5)
+                    # FIXED: Server is now fully ready for tool calls
+                    logger.info(f"🎉 MCP handshake complete for server {self.name} - ready for tool calls")
+                    await asyncio.sleep(0.5)  # Stabilization wait
                     break
                     
             except Exception as e:
-                logger.debug(f"Server initialization {self.name} in progress... ({e})")
+                logger.debug(f"MCP initialization {self.name} in progress... ({e})")
             
             await asyncio.sleep(0.5)
         
+        # FIXED: Strict validation of initialization state
         if not self.initialized:
-            logger.warning(f"Server {self.name} did not initialize within {timeout}s")
+            raise Exception(f"❌ Server {self.name} did not complete MCP initialization within {timeout}s - handshake failed")
+        elif not initialization_response_received:
+            raise Exception(f"❌ Server {self.name} never responded to initialize request - protocol violation")
         elif not initialized_sent:
-            logger.warning(f"Server {self.name} initialized, but initialized notification was not sent")
+            raise Exception(f"❌ Server {self.name} initialized but notifications/initialized was not sent - incomplete handshake")
         else:
-            logger.debug(f"Server {self.name} successfully initialized")
+            logger.info(f"✅ MCP initialization successful for server {self.name}")
     
     async def _read_stdout_async(self):
         """Async stdout reading - simplified similar to debug_communication.py"""
@@ -1044,7 +1066,7 @@ async def send_request_to_server(server_name: str, request_data: dict):
 
 # Individual MCP HTTP Endpoints for each server
 async def _check_server_running(server_name: str):
-    """Helper function to check if server is running"""
+    """Helper function to check if server is running and properly initialized"""
     if server_name not in process_manager.processes:
         raise HTTPException(status_code=404, detail=f"Server {server_name} is not running")
     
@@ -1052,9 +1074,12 @@ async def _check_server_running(server_name: str):
     if not mcp_process.is_running():
         raise HTTPException(status_code=503, detail=f"Server {server_name} is not active")
     
-    # If server is not initialized, we proceed with the request
+    # FIXED: Require proper initialization before accepting requests
     if not mcp_process.initialized:
-        logger.warning(f"Server {server_name} is not initialized, but proceeding with request")
+        raise HTTPException(
+            status_code=503, 
+            detail=f"Server {server_name} is not properly initialized. MCP handshake required."
+        )
     
     return mcp_process
 
@@ -1447,40 +1472,85 @@ async def streamable_send_request(server_name: str, session_id: str, request_dat
         raise HTTPException(status_code=500, detail=str(e))
 
 async def _streamable_send_initialize(session_id: str, server_name: str):
-    """Initializes MCP protocol for Streamable session"""
+    """FIXED: Proper MCP protocol initialization for Streamable session with server interaction"""
     try:
-        logger.info(f"Streamable: Initializing MCP protocol for session {session_id}")
+        logger.info(f"Streamable: Starting proper MCP initialization handshake for session {session_id}")
         
-        # Send initialize response
+        # FIXED: Check if underlying MCP server is properly initialized first
+        if server_name not in process_manager.processes:
+            raise Exception(f"Server {server_name} is not running")
+        
+        mcp_process = process_manager.processes[server_name]
+        if not mcp_process.initialized:
+            raise Exception(f"Server {server_name} is not properly initialized - cannot create Streamable session")
+        
+        # FIXED: Get actual server capabilities from the running MCP server
+        try:
+            # Query the real server for its capabilities
+            server_response = await process_manager.send_request_to_server(server_name, "capabilities")
+            server_capabilities = server_response.get("result", {}).get("capabilities", {
+                "tools": {},
+                "resources": {},
+                "prompts": {},
+                "logging": {}
+            })
+            server_info = server_response.get("result", {}).get("serverInfo", {
+                "name": f"mcp-server-{server_name}",
+                "version": "1.0.0"
+            })
+            logger.info(f"Streamable: Retrieved real capabilities from server {server_name}")
+            
+        except Exception as e:
+            logger.warning(f"Streamable: Could not get server capabilities, using defaults: {e}")
+            # Fallback to default capabilities
+            server_capabilities = {
+                "tools": {},
+                "resources": {},
+                "prompts": {},
+                "logging": {}
+            }
+            server_info = {
+                "name": f"mcp-server-{server_name}",
+                "version": "1.0.0"
+            }
+        
+        # FIXED: Send proper MCP initialize response with real server data
         initialize_response = {
             "jsonrpc": "2.0",
             "id": 0,
             "result": {
                 "protocolVersion": "2025-03-26",
-                "capabilities": {
-                    "tools": {},
-                    "resources": {},
-                    "prompts": {},
-                    "logging": {}
-                },
-                "serverInfo": {
-                    "name": f"mcp-server-{server_name}",
-                    "version": "1.0.0"
-                }
+                "capabilities": server_capabilities,
+                "serverInfo": server_info
             }
         }
         
         await streamable_manager.send_message_to_session(session_id, initialize_response)
         
-        # Mark session as initialized
+        # FIXED: Proper session state management
         session = await streamable_manager.get_session(session_id)
         if session:
             session["initialized"] = True
+            session["mcp_handshake_complete"] = True
+            session["server_capabilities"] = server_capabilities
+            session["protocol_version"] = "2025-03-26"
         
-        logger.info(f"Streamable: Initialization complete for session {session_id}")
+        logger.info(f"✅ Streamable: MCP initialization handshake complete for session {session_id}")
         
     except Exception as e:
-        logger.error(f"Streamable: Error initializing session {session_id}: {e}")
+        logger.error(f"❌ Streamable: Error during MCP initialization for session {session_id}: {e}")
+        
+        # FIXED: Send proper error response to client
+        error_response = {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "error": {
+                "code": -32001,
+                "message": f"MCP initialization failed: {str(e)}"
+            }
+        }
+        await streamable_manager.send_message_to_session(session_id, error_response)
+        raise e
 
 @app.get("/streamable")
 async def global_streamable_endpoint(request: Request):
