@@ -10,6 +10,7 @@ from unittest.mock import patch, MagicMock
 import tempfile
 import os
 import json
+from security_manager import SecurityManager, get_security_manager
 from pathlib import Path
 
 # Add parent directory to path to import modules
