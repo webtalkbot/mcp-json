@@ -166,7 +166,7 @@ class MCPProcess:
                         "id": 0,
                         "method": "initialize",
                         "params": {
-                            "protocolVersion": "2024-11-05",
+                            "protocolVersion": "2025-03-26",
                             "capabilities": {},
                             "clientInfo": {
                                 "name": "mcp-wrapper",
@@ -863,25 +863,84 @@ async def root():
 # MCP Discovery endpoints for Claude Desktop
 @app.get("/.well-known/mcp")
 async def mcp_discovery():
-    """MCP Discovery endpoint for Claude Desktop"""
+    """MCP Discovery endpoint for Claude Desktop - MCP Protocol 2025-03-26 compliant"""
     servers = db.list_servers()
     running_servers = [s for s in servers if s['status'] == 'running']
     
+    # Build server list with full MCP 2025-03-26 specification
     mcp_servers = []
     for server in running_servers:
         server_name = server['name']
-        mcp_servers.append({
+        server_entry = {
             "name": server_name,
             "description": server.get('description', f"MCP Server {server_name}"),
-            "capabilities": f"/servers/{server_name}/mcp/capabilities",
-            "tools": f"/servers/{server_name}/mcp/tools/list",
-            "transport": "http"
-        })
+            "version": "1.0.0",
+            "protocol_version": "2025-03-26",
+            "capabilities": {
+                "tools": True,
+                "resources": True,
+                "prompts": False,
+                "logging": True
+            },
+            "transports": [
+                {
+                    "type": "streamable-http",
+                    "endpoint": f"/servers/{server_name}/streamable",
+                    "description": "Streamable HTTP Transport for real-time MCP communication"
+                },
+                {
+                    "type": "http-rest", 
+                    "endpoint": f"/servers/{server_name}/mcp",
+                    "description": "Standard HTTP REST API endpoints"
+                }
+            ],
+            "endpoints": {
+                "capabilities": f"/servers/{server_name}/mcp/capabilities",
+                "tools_list": f"/servers/{server_name}/mcp/tools/list",
+                "tools_call": f"/servers/{server_name}/mcp/tools/call",
+                "resources_list": f"/servers/{server_name}/mcp/resources/list",
+                "streamable": f"/servers/{server_name}/streamable"
+            },
+            "metadata": {
+                "author": "MCP Server Manager",
+                "license": "MIT",
+                "homepage": f"/servers/{server_name}",
+                "repository": "local"
+            }
+        }
+        mcp_servers.append(server_entry)
     
+    # MCP 2025-03-26 compliant discovery response
     return {
-        "mcp": {
-            "version": "2024-11-05",
-            "servers": mcp_servers
+        "protocol_version": "2025-03-26",
+        "implementation": {
+            "name": "mcp-server-manager",
+            "version": "1.0.0",
+            "description": "Universal MCP wrapper supporting REST API and Streamable HTTP transport"
+        },
+        "capabilities": {
+            "transports": ["streamable-http", "http-rest"],
+            "features": ["auto-discovery", "multi-server", "process-monitoring"],
+            "authentication": False,
+            "encryption": False
+        },
+        "servers": mcp_servers,
+        "transports": {
+            "streamable-http": {
+                "description": "Streamable HTTP transport for real-time MCP communication",
+                "global_endpoint": "/streamable",
+                "features": ["bidirectional", "real-time", "connection-pooling"]
+            },
+            "http-rest": {
+                "description": "Standard HTTP REST API endpoints", 
+                "global_endpoint": "/mcp",
+                "features": ["stateless", "cacheable", "standard-http"]
+            }
+        },
+        "discovery": {
+            "auto_refresh": True,
+            "refresh_interval": 30,
+            "health_check": "/health"
         }
     }
 
@@ -900,7 +959,7 @@ async def mcp_global_capabilities():
             "prompts": {},
             "logging": {}
         },
-        "protocolVersion": "2024-11-05",
+        "protocolVersion": "2025-03-26",
         "serverInfo": {
             "name": "mcp-server-manager",
             "version": "1.0.0"
@@ -1011,7 +1070,7 @@ async def get_server_mcp_capabilities(server_name: str = Path(..., description="
             "prompts": {},
             "logging": {}
         },
-        "protocolVersion": "2024-11-05",
+        "protocolVersion": "2025-03-26",
         "serverInfo": {
             "name": f"mcp-server-{server_name}",
             "version": "1.0.0"
@@ -1309,7 +1368,7 @@ async def streamable_mcp_transport_post(server_name: str, request_data: dict):
                 "jsonrpc": "2.0",
                 "id": request_id,
                 "result": {
-                    "protocolVersion": "2024-11-05",
+                    "protocolVersion": "2025-03-26",
                     "capabilities": {
                         "tools": {},
                         "resources": {},
@@ -1397,7 +1456,7 @@ async def _streamable_send_initialize(session_id: str, server_name: str):
             "jsonrpc": "2.0",
             "id": 0,
             "result": {
-                "protocolVersion": "2024-11-05",
+                "protocolVersion": "2025-03-26",
                 "capabilities": {
                     "tools": {},
                     "resources": {},
