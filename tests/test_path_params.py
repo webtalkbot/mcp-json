@@ -8,13 +8,18 @@ import json
 import sys
 import os
 import aiohttp
+
+# Add parent directory to Python path to import concurrent_mcp_server
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, parent_dir)
+
 from concurrent_mcp_server import ThreadSafeConfigManager, ConcurrentRESTClient
 
 async def test_path_params():
     """Test path parameter substitution"""
     
-    # Initialize config manager
-    config_manager = ThreadSafeConfigManager(config_dir=".")
+    # Initialize config manager - point to parent directory where servers/ folder is
+    config_manager = ThreadSafeConfigManager(config_dir=parent_dir)
     
     # Test loading coingecko server
     config = await config_manager.load_server("coingecko")
