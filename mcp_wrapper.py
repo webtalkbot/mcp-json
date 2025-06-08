@@ -20,6 +20,11 @@ import psutil
 import queue
 import uuid
 from dotenv import load_dotenv
+from error_logger import (
+    get_error_logger, log_server_crash, log_server_restart, 
+    log_streamable_error, log_tools_list_error, log_tools_call_error,
+    log_initialization_error, log_custom_error
+)
 
 # Load environment variables
 load_dotenv()
@@ -141,6 +146,15 @@ class MCPProcess:
             
         except Exception as e:
             logger.error(f"❌ Error starting server {self.name}: {e}")
+            
+            # Log server crash with context
+            log_server_crash(self.name, e, {
+                "phase": "startup",
+                "script_path": self.script_path,
+                "pid": self.process.pid if self.process else None,
+                "initialized": self.initialized
+            })
+            
             # Cleanup on error
             self.running = False
             if self.process:
@@ -225,11 +239,31 @@ class MCPProcess:
         
         # FIXED: Strict validation of initialization state
         if not self.initialized:
-            raise Exception(f"❌ Server {self.name} did not complete MCP initialization within {timeout}s - handshake failed")
+            error = Exception(f"❌ Server {self.name} did not complete MCP initialization within {timeout}s - handshake failed")
+            log_initialization_error(self.name, error, {
+                "phase": "initialization_timeout",
+                "timeout": timeout,
+                "init_sent": init_sent,
+                "response_received": initialization_response_received,
+                "initialized_sent": initialized_sent
+            })
+            raise error
         elif not initialization_response_received:
-            raise Exception(f"❌ Server {self.name} never responded to initialize request - protocol violation")
+            error = Exception(f"❌ Server {self.name} never responded to initialize request - protocol violation")
+            log_initialization_error(self.name, error, {
+                "phase": "no_response",
+                "timeout": timeout,
+                "init_sent": init_sent
+            })
+            raise error
         elif not initialized_sent:
-            raise Exception(f"❌ Server {self.name} initialized but notifications/initialized was not sent - incomplete handshake")
+            error = Exception(f"❌ Server {self.name} initialized but notifications/initialized was not sent - incomplete handshake")
+            log_initialization_error(self.name, error, {
+                "phase": "incomplete_handshake",
+                "init_sent": init_sent,
+                "response_received": initialization_response_received
+            })
+            raise error
         else:
             logger.info(f"✅ MCP initialization successful for server {self.name}")
     
@@ -692,11 +726,25 @@ class ProcessManager:
                 self.restart_attempts[server_name] = 0  # Reset counter
                 logger.info(f"✅ Successfully restarted {server_name}")
                 
+                # Log successful restart with detailed context
+                log_server_restart(server_name, restart_count + 1, True, {
+                    "restart_reason": "process_monitoring_detected_failure",
+                    "monitoring_interval": "30_seconds",
+                    "max_attempts": self.max_restart_attempts
+                })
+                
                 # Update database
                 db.add_log(server_name, "INFO", f"Automatically restarted (attempt {restart_count + 1})")
             else:
                 self.restart_attempts[server_name] = restart_count + 1
                 logger.error(f"❌ Failed to restart {server_name} (attempt {restart_count + 1})")
+                
+                # Log failed restart attempt
+                log_server_restart(server_name, restart_count + 1, False, {
+                    "restart_reason": "process_monitoring_detected_failure", 
+                    "failure_reason": "start_server_returned_false",
+                    "remaining_attempts": self.max_restart_attempts - (restart_count + 1)
+                })
                 
                 # Update database
                 db.add_log(server_name, "ERROR", f"Auto-restart failed (attempt {restart_count + 1})")
@@ -704,6 +752,15 @@ class ProcessManager:
         except Exception as e:
             self.restart_attempts[server_name] = restart_count + 1
             logger.error(f"❌ Exception during restart of {server_name}: {e}")
+            
+            # Log restart exception with full context
+            log_server_restart(server_name, restart_count + 1, False, {
+                "restart_reason": "process_monitoring_detected_failure",
+                "failure_reason": "exception_during_restart",
+                "exception_type": type(e).__name__,
+                "exception_message": str(e),
+                "remaining_attempts": self.max_restart_attempts - (restart_count + 1)
+            })
             
             # Update database
             db.add_log(server_name, "ERROR", f"Auto-restart exception: {str(e)}")
@@ -1787,6 +1844,14 @@ async def list_server_mcp_tools(server_name: str = Path(..., description="Name o
     
     except Exception as e:
         logger.error(f"MCP: Error getting tools from {server_name}: {e}")
+        
+        # Log tools/list error with context
+        log_tools_list_error(server_name, e, {
+            "operation": "mcp_endpoint_tools_list",
+            "endpoint": f"/servers/{server_name}/mcp/tools/list",
+            "server_status": process_manager.get_server_status(server_name).get("status", "unknown")
+        })
+        
         raise HTTPException(status_code=500, detail=f"Failed to get tools from server {server_name}")
 
 @app.post("/servers/{server_name}/mcp/tools/call")
@@ -1876,6 +1941,16 @@ async def call_server_mcp_tool(server_name: str, request_data: dict):
     
     except Exception as e:
         logger.error(f"MCP: Error executing tool on {server_name}: {e}")
+        
+        # Log tools/call error with context
+        log_tools_call_error(server_name, tool_name, e, {
+            "operation": "mcp_endpoint_tools_call",
+            "endpoint": f"/servers/{server_name}/mcp/tools/call",
+            "tool_name": tool_name,
+            "arguments": arguments,
+            "server_status": process_manager.get_server_status(server_name).get("status", "unknown")
+        })
+        
         return {
             "content": [
                 {
@@ -1982,6 +2057,14 @@ async def streamable_mcp_transport_get(server_name: str, request: Request):
                     break
                 except Exception as e:
                     logger.error(f"Streamable: Unexpected error in stream loop for session {session_id}: {e}")
+                    
+                    # Log streamable error with session context
+                    log_streamable_error(server_name, session_id, e, {
+                        "transport": "streamable",
+                        "phase": "stream_loop",
+                        "client_disconnected": False
+                    })
+                    
                     # Continue loop, might be a temporary error
                     try:
                         await asyncio.sleep(1.0)
@@ -2647,6 +2730,115 @@ async def cleanup_expired_sessions():
         }
     except Exception as e:
         logger.error(f"Error cleaning up sessions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ===============================
+# 🚨 ERROR LOGGING ENDPOINTS
+# ===============================
+
+@app.get("/logs/errors")
+async def get_error_logs(hours: int = 24, server_name: Optional[str] = None):
+    """Get recent error logs"""
+    try:
+        error_logger = get_error_logger()
+        recent_errors = error_logger.get_recent_errors(hours=hours, server_name=server_name)
+        
+        return {
+            "errors": recent_errors,
+            "total_count": len(recent_errors),
+            "hours_filter": hours,
+            "server_filter": server_name,
+            "description": f"Recent errors from last {hours} hours"
+        }
+    except Exception as e:
+        logger.error(f"Error getting error logs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/logs/errors/stats")
+async def get_error_stats():
+    """Get error statistics and system info"""
+    try:
+        error_logger = get_error_logger()
+        stats = error_logger.get_error_stats()
+        
+        return {
+            "error_stats": stats,
+            "description": "Error logging statistics and system information"
+        }
+    except Exception as e:
+        logger.error(f"Error getting error stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/logs/errors/{server_name}")
+async def get_server_error_logs(server_name: str, hours: int = 24):
+    """Get error logs for specific server"""
+    try:
+        error_logger = get_error_logger()
+        server_errors = error_logger.get_recent_errors(hours=hours, server_name=server_name)
+        
+        # Get server status for context
+        server_status = process_manager.get_server_status(server_name)
+        
+        return {
+            "server_name": server_name,
+            "server_status": server_status,
+            "errors": server_errors,
+            "total_count": len(server_errors),
+            "hours_filter": hours,
+            "description": f"Recent errors for server {server_name} from last {hours} hours"
+        }
+    except Exception as e:
+        logger.error(f"Error getting server error logs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/logs/test")
+async def test_error_logging():
+    """Test endpoint to generate sample error logs"""
+    try:
+        # Test different types of error logging
+        test_server = "test_server"
+        
+        # Test server crash logging
+        test_error = Exception("Test server crash for logging demonstration")
+        log_server_crash(test_server, test_error, {
+            "phase": "test",
+            "test_type": "manual_test",
+            "timestamp": time.time()
+        })
+        
+        # Test restart logging
+        log_server_restart(test_server, 1, True, {
+            "restart_reason": "manual_test",
+            "test": True
+        })
+        
+        # Test streamable error logging
+        log_streamable_error(test_server, "test-session-123", test_error, {
+            "transport": "test",
+            "phase": "test",
+            "test": True
+        })
+        
+        # Test tools error logging
+        log_tools_list_error(test_server, test_error, {
+            "operation": "test",
+            "test": True
+        })
+        
+        # Test custom error logging
+        log_custom_error("INFO", "TEST", test_server, "Test custom error log", test_error, {
+            "test": True,
+            "manual_trigger": True
+        })
+        
+        return {
+            "message": "Test error logs generated successfully",
+            "server_name": test_server,
+            "logs_generated": 5,
+            "types": ["server_crash", "server_restart", "streamable_error", "tools_error", "custom_error"]
+        }
+    except Exception as e:
+        logger.error(f"Error testing error logging: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # Explicitly disabled endpoints for security
