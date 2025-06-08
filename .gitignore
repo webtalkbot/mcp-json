@@ -1,18 +1,33 @@
+# Environment files
+.env
+
 # Python cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
-# Data files
+# Data directory (keep structure, ignore content)
 /data/*
 !/data/
 !/data/.gitkeep
 
-# Logs
+# Logs directory (keep structure, ignore content)  
 /logs/*
 !/logs/
 !/logs/.gitkeep
 
-# Environment
-.env
+# macOS system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
