@@ -38,7 +38,7 @@ except ImportError:
 try:
     from mcp.server import Server, NotificationOptions
     from mcp.server.models import InitializationOptions
-    from mcp.types import Resource, Tool, TextContent
+    from mcp.types import Resource, Tool, TextContent, Implementation, ServerCapabilities, ToolsCapability, ResourcesCapability, PromptsCapability, LoggingCapability
     import mcp.types as types
     from mcp.server.stdio import stdio_server
 except ImportError as e:
@@ -609,9 +609,6 @@ for notification_type in notification_types:
     server.notification_handlers[notification_type] = universal_notification_handler
 
 print(f"✅ INFO: Registered {len(notification_types)} notification handlers")
-
-# 🔧 FIXED: Remove custom initialize handler - let MCP Server handle it natively
-print(f"✅ INFO: Using native MCP initialize handling")
 
 @server.list_tools()
 async def handle_list_tools() -> List[Tool]:
