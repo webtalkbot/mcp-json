@@ -927,15 +927,18 @@ async def main():
             print(f"🔒 INFO: Security manager initialized")
             
             async with stdio_server() as (read_stream, write_stream):
+                # MCP Protocol version 2025-03-26 compliance
                 init_options = InitializationOptions(
                     server_name="concurrent-config-mcp-server",
                     server_version="1.0.0",
                     capabilities=server.get_capabilities(
                         notification_options=NotificationOptions(),
                         experimental_capabilities={}
-                    )
+                    ),
+                    protocol_version="2025-03-26"  # NEW: MCP Protocol version declaration
                 )
                 
+                print(f"🔌 INFO: MCP Server initialized with protocol version: 2025-03-26")
                 await server.run(read_stream, write_stream, init_options)
     
     except Exception as e:
