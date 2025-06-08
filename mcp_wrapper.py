@@ -373,37 +373,6 @@ class MCPProcess:
             data = json.loads(message)
             logger.debug(f"Received message from {self.name}: {data}")
             
-            # ✅ OPRAVA: Handle initialize request automatically
-            if data.get("method") == "initialize" and "id" in data:
-                logger.info(f"Server {self.name} handling initialize request")
-                initialize_response = {
-                    "jsonrpc": "2.0",
-                    "id": data["id"],
-                    "result": {
-                        "protocolVersion": "2024-11-05",
-                        "capabilities": {
-                            "tools": {},
-                            "resources": {},
-                            "prompts": {},
-                            "logging": {}
-                        },
-                        "serverInfo": {
-                            "name": f"concurrent-config-mcp-server-{self.name}",
-                            "version": "1.0.0"
-                        }
-                    }
-                }
-                
-                # Send response back
-                response_json = json.dumps(initialize_response) + '\n'
-                self.process.stdin.write(response_json)
-                self.process.stdin.flush()
-                logger.info(f"Server {self.name} sent initialize response")
-                
-                # Mark as initialized only after sending response
-                self.initialized = True
-                return
-            
             # Check if it's a response to initialize (id=0 and has result)
             if data.get("id") == 0 and "result" in data:
                 self.initialized = True
