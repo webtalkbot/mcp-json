@@ -206,35 +206,36 @@ async def test_streamable_vs_sse():
         except Exception as e:
             print(f"❌ Streamable HTTP error: {e}")
     
-    # Test SSE Transport (deprecated)
-    print("\n📌 SSE Transport Test (deprecated):")
+    # Test SSE Transport (active)
+    print("\n📌 SSE Transport Test (active):")
     async with aiohttp.ClientSession() as session:
         try:
             async with session.post(f"{base_url}/servers/{server_name}/sse", json=initialize_request) as resp:
                 print(f"📈 Status: {resp.status}")
                 if resp.status == 200:
                     data = await resp.json()
-                    print(f"✅ SSE Transport: Works (redirected to Streamable)")
-                    print(f"⚠️ DEPRECATED: Use /streamable instead of /sse")
+                    print(f"✅ SSE Transport: Active and functional")
+                    print(f"🔧 Media type: text/event-stream")
+                    print(f"📦 Format: data: {{json}}\\n\\n")
                 else:
                     print(f"❌ SSE Transport failed: {resp.status}")
         except Exception as e:
             print(f"❌ SSE Transport error: {e}")
     
     print("\n" + "="*60)
-    print("📋 SUMMARY OF CHANGES")
+    print("📋 BOTH TRANSPORTS ARE ACTIVE")
     print("="*60)
-    print("✅ Streamable HTTP Transport - new primary transport")
+    print("✅ Streamable HTTP Transport - for Claude Desktop")
     print("  🔧 Media type: application/json")
     print("  📦 Format: JSON objects per line")
     print("  🚀 URL: /servers/{server_name}/streamable")
     print("")
-    print("⚠️ SSE Transport - deprecated")
+    print("✅ SSE Transport - for other MCP clients")
     print("  🔧 Media type: text/event-stream")
-    print("  📦 Format: data: {json}\\n\\n")
-    print("  🚀 URL: /servers/{server_name}/sse (redirected)")
+    print("  📦 Format: data: {{json}}\\n\\n")
+    print("  🚀 URL: /servers/{server_name}/sse")
     print("")
-    print("🎯 Claude Desktop should use the new Streamable endpoint!")
+    print("🎯 Both transports are fully functional - choose based on your client!")
 
 async def test_tools_via_streamable():
     """Test MCP tools calls via Streamable transport"""

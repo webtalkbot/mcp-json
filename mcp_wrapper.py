@@ -966,9 +966,10 @@ async def root():
         }
         streamable_endpoints[server_name] = {
             "streamable_transport": f"/servers/{server_name}/streamable",
-            "description": f"Streamable HTTP Transport for {server_name}",
-            "usage": "For Claude Desktop - connect to Streamable HTTP endpoint",
-            "deprecated_sse": f"/servers/{server_name}/sse (deprecated)"
+            "sse_transport": f"/servers/{server_name}/sse",
+            "description_streamable": f"Streamable HTTP Transport for {server_name}",
+            "description_sse": f"SSE Transport for {server_name}",
+            "usage": "Both transports are active - choose based on your client needs"
         }
     
     return {
@@ -979,14 +980,14 @@ async def root():
         "version": "1.0.0",
         "transports": {
             "http_rest": "Standard HTTP REST API endpoints",
-            "streamable_http": "Streamable HTTP transport for real-time MCP communication (replacement for SSE)",
-            "sse_transport": "DEPRECATED: Server-Sent Events (use /streamable instead of /sse)"
+            "streamable_http": "Streamable HTTP transport for real-time MCP communication (JSON per line)",
+            "sse_transport": "Server-Sent Events transport for real-time MCP communication (data: format)"
         },
         "endpoints": {
             "rest_api_endpoints": mcp_endpoints,
             "streamable_transport_endpoints": streamable_endpoints,
             "global_streamable": "/streamable",
-            "global_sse_deprecated": "/sse (deprecated)",
+            "global_sse": "/sse",
             "discovery": "/.well-known/mcp",
             "global_tools_proxy": {
                 "tools_list": "/mcp/tools/list",
@@ -996,8 +997,8 @@ async def root():
             }
         },
         "usage": {
-            "claude_desktop_url": "http://localhost:8999/servers/{server_name}/streamable",
-            "claude_desktop_url_deprecated": "http://localhost:8999/servers/{server_name}/sse (deprecated)",
+            "claude_desktop_streamable_url": "http://localhost:8999/servers/{server_name}/streamable",
+            "claude_desktop_sse_url": "http://localhost:8999/servers/{server_name}/sse",
             "rest_api_example": "http://localhost:8999/servers/{server_name}/mcp/tools/list",
             "global_tools_example": "http://localhost:8999/mcp/tools/list",
             "health_check": "/health"
@@ -2252,27 +2253,329 @@ async def global_streamable_endpoint(request: Request):
         }
     )
 
-# Backward compatibility - SSE endpoints (deprecated)
+# ===============================
+# 🔄 SSE (Server-Sent Events) TRANSPORT ENDPOINTS - ACTIVE
+# ===============================
+
 @app.get("/servers/{server_name}/sse")
-async def sse_mcp_transport_get_deprecated(server_name: str, request: Request):
-    """DEPRECATED: SSE MCP Transport endpoint - use /streamable instead"""
-    logger.warning(f"SSE endpoint /servers/{server_name}/sse is deprecated. Use /servers/{server_name}/streamable instead.")
-    # Redirect to streamable endpoint
-    return await streamable_mcp_transport_get(server_name, request)
+async def sse_mcp_transport_get(server_name: str, request: Request):
+    """SSE MCP Transport endpoint for Claude Desktop (GET - SSE streaming)"""
+    logger.info(f"SSE: New GET connection for server {server_name}")
+    
+    # Check if server is running
+    await _check_server_running(server_name)
+    
+    # Create SSE session
+    session_id = await streamable_manager.create_session(server_name)
+    
+    async def sse_event_stream():
+        try:
+            # Initialize MCP protocol with error handling
+            try:
+                await _sse_send_initialize(session_id, server_name)
+            except Exception as e:
+                logger.error(f"SSE: Error initializing session {session_id}: {e}")
+                error_response = {
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": -32001,
+                        "message": f"Initialization error: {str(e)}"
+                    }
+                }
+                yield f"data: {json.dumps(error_response)}\n\n"
+                return
+            
+            # Main SSE communication loop
+            while True:
+                try:
+                    # Check if client is still listening
+                    try:
+                        if await request.is_disconnected():
+                            logger.info(f"SSE: Client disconnected for session {session_id}")
+                            break
+                    except Exception as e:
+                        logger.debug(f"SSE: Error checking client disconnection: {e}")
+                        # Continue even if disconnection check fails
+                    
+                    # Get message from MCP server with error handling
+                    try:
+                        message = await streamable_manager.get_message_from_session(session_id, timeout=5.0)
+                    except Exception as e:
+                        logger.warning(f"SSE: Error getting message for session {session_id}: {e}")
+                        continue
+                    
+                    if message:
+                        try:
+                            # Send message to client in proper SSE format
+                            yield f"data: {json.dumps(message)}\n\n"
+                        except Exception as e:
+                            logger.error(f"SSE: Error sending message to client: {e}")
+                            break
+                    else:
+                        # Heartbeat - keep connection alive
+                        heartbeat = {
+                            "type": "heartbeat", 
+                            "timestamp": time.time()
+                        }
+                        yield f"data: {json.dumps(heartbeat)}\n\n"
+                    
+                    # Short pause with error handling
+                    try:
+                        await asyncio.sleep(0.1)
+                    except asyncio.CancelledError:
+                        logger.debug(f"SSE: Stream for session {session_id} was cancelled")
+                        break
+                    except Exception as e:
+                        logger.debug(f"SSE: Error during sleep: {e}")
+                        
+                except asyncio.CancelledError:
+                    logger.debug(f"SSE: Stream loop for session {session_id} was cancelled")
+                    break
+                except Exception as e:
+                    logger.error(f"SSE: Unexpected error in stream loop for session {session_id}: {e}")
+                    # Continue loop, might be a temporary error
+                    try:
+                        await asyncio.sleep(1.0)
+                    except:
+                        break
+        
+        except asyncio.CancelledError:
+            logger.debug(f"SSE: Event stream for session {session_id} was cancelled")
+        except Exception as e:
+            logger.error(f"SSE: Critical error in event stream for session {session_id}: {e}")
+            try:
+                error_response = {
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": -32000,
+                        "message": f"Stream error: {str(e)}"
+                    }
+                }
+                yield f"data: {json.dumps(error_response)}\n\n"
+            except Exception:
+                pass  # Cannot yield, stream is already corrupted
+        
+        finally:
+            # Cleanup session with error handling
+            try:
+                await streamable_manager.remove_session(session_id)
+                logger.info(f"SSE: Session {session_id} closed")
+            except Exception as e:
+                logger.error(f"SSE: Error closing session {session_id}: {e}")
+    
+    return StreamingResponse(
+        sse_event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Transfer-Encoding": "chunked",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        }
+    )
 
 @app.post("/servers/{server_name}/sse")
-async def sse_mcp_transport_post_deprecated(server_name: str, request_data: dict):
-    """DEPRECATED: SSE MCP Transport endpoint - use /streamable instead"""
-    logger.warning(f"SSE endpoint POST /servers/{server_name}/sse is deprecated. Use /servers/{server_name}/streamable instead.")
-    # Redirect to streamable endpoint
-    return await streamable_mcp_transport_post(server_name, request_data)
+async def sse_mcp_transport_post(server_name: str, request_data: dict):
+    """SSE MCP Transport endpoint for MCP Inspector (POST - direct request/response)"""
+    logger.info(f"SSE: New POST request for server {server_name}")
+    
+    # Check if server is running
+    await _check_server_running(server_name)
+    
+    try:
+        # Validate JSON-RPC request
+        method = request_data.get("method")
+        params = request_data.get("params")
+        request_id = request_data.get("id")
+        
+        logger.info(f"SSE POST: {method} with ID {request_id}")
+        
+        if not method:
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "error": {
+                    "code": -32600,
+                    "message": "Invalid Request - missing method"
+                }
+            }
+        
+        # Special handling for initialize
+        if method == "initialize":
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {
+                    "protocolVersion": "2025-03-26",
+                    "capabilities": {
+                        "tools": {},
+                        "resources": {},
+                        "prompts": {},
+                        "logging": {}
+                    },
+                    "serverInfo": {
+                        "name": f"mcp-server-{server_name}",
+                        "version": "1.0.0"
+                    }
+                }
+            }
+        
+        # Send request to MCP server
+        response = await process_manager.send_request_to_server(server_name, method, params)
+        
+        # Add request ID to response
+        if request_id is not None:
+            response["id"] = request_id
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"SSE POST: Error processing request: {e}")
+        return {
+            "jsonrpc": "2.0",
+            "id": request_data.get("id"),
+            "error": {
+                "code": -32000,
+                "message": str(e)
+            }
+        }
 
 @app.get("/sse")
-async def global_sse_endpoint_deprecated(request: Request):
-    """DEPRECATED: Global SSE endpoint - use /streamable instead"""
-    logger.warning("SSE endpoint /sse is deprecated. Use /streamable instead.")
-    # Redirect to streamable endpoint
-    return await global_streamable_endpoint(request)
+async def global_sse_endpoint(request: Request):
+    """Global SSE endpoint for discovery"""
+    logger.info("SSE: Global SSE connection")
+    
+    async def sse_event_stream():
+        try:
+            # Send list of available servers
+            servers = db.list_servers()
+            running_servers = [s for s in servers if s['status'] == 'running']
+            
+            discovery_message = {
+                "type": "discovery",
+                "servers": [
+                    {
+                        "name": server['name'],
+                        "description": server.get('description', f"MCP Server {server['name']}"),
+                        "sse_endpoint": f"/servers/{server['name']}/sse",
+                        "streamable_endpoint": f"/servers/{server['name']}/streamable",
+                        "capabilities": f"/servers/{server['name']}/mcp/capabilities"
+                    }
+                    for server in running_servers
+                ]
+            }
+            
+            # Proper SSE format
+            yield f"data: {json.dumps(discovery_message)}\n\n"
+            
+            # Heartbeat loop
+            while True:
+                try:
+                    if await request.is_disconnected():
+                        break
+                    
+                    # Send heartbeat every 30 seconds
+                    heartbeat = {
+                        "type": "heartbeat",
+                        "timestamp": time.time(),
+                        "servers_count": len(running_servers)
+                    }
+                    yield f"data: {json.dumps(heartbeat)}\n\n"
+                    
+                    await asyncio.sleep(30)
+                    
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    logger.error(f"SSE: Error in heartbeat loop: {e}")
+                    break
+                
+        except Exception as e:
+            logger.error(f"SSE: Error in global endpoint: {e}")
+            error_response = {
+                "type": "error", 
+                "message": str(e)
+            }
+            yield f"data: {json.dumps(error_response)}\n\n"
+    
+    return StreamingResponse(
+        sse_event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Transfer-Encoding": "chunked",
+            "Access-Control-Allow-Origin": "*",
+        }
+    )
+
+async def _sse_send_initialize(session_id: str, server_name: str):
+    """SSE-specific MCP protocol initialization for SSE session with server interaction"""
+    try:
+        logger.info(f"SSE: Starting MCP initialization handshake for session {session_id}")
+        
+        # Check if underlying MCP server is properly initialized first
+        server_status = process_manager.get_server_status(server_name)
+        if server_status.get("status") != "running":
+            raise Exception(f"Server {server_name} is not running")
+        
+        if not server_status.get("initialized", False):
+            raise Exception(f"Server {server_name} is not properly initialized - cannot create SSE session")
+        
+        # Use default capabilities for SSE (avoid server capabilities call)
+        server_capabilities = {
+            "tools": {},
+            "resources": {},
+            "prompts": {},
+            "logging": {}
+        }
+        server_info = {
+            "name": f"mcp-server-{server_name}",
+            "version": "1.0.0"
+        }
+        logger.info(f"SSE: Using default capabilities for session {session_id}")
+        
+        # Send proper MCP initialize response with real server data
+        initialize_response = {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "result": {
+                "protocolVersion": "2025-03-26",
+                "capabilities": server_capabilities,
+                "serverInfo": server_info,
+                "transport": "sse"
+            }
+        }
+        
+        await streamable_manager.send_message_to_session(session_id, initialize_response)
+        
+        # Proper session state management
+        session = await streamable_manager.get_session(session_id)
+        if session:
+            session["initialized"] = True
+            session["transport"] = "sse"
+            session["mcp_handshake_complete"] = True
+            session["server_capabilities"] = server_capabilities
+            session["protocol_version"] = "2025-03-26"
+        
+        logger.info(f"✅ SSE: MCP initialization handshake complete for session {session_id}")
+        
+    except Exception as e:
+        logger.error(f"❌ SSE: Error during MCP initialization for session {session_id}: {e}")
+        
+        # Send proper error response to client
+        error_response = {
+            "jsonrpc": "2.0",
+            "id": 0,
+            "error": {
+                "code": -32001,
+                "message": f"SSE MCP initialization failed: {str(e)}"
+            }
+        }
+        await streamable_manager.send_message_to_session(session_id, error_response)
+        raise e
 
 @app.get("/monitoring/status")
 async def get_monitoring_status():
