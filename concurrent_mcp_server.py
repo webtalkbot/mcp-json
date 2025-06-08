@@ -56,8 +56,8 @@ def http_retry(max_retries: int = 3, base_delay: float = 1.0, backoff_factor: fl
                         isinstance(e, aiohttp.ClientConnectorError),
                         isinstance(e, aiohttp.ServerTimeoutError),
                         isinstance(e, aiohttp.ServerDisconnectedError),
-                        # For HTTP status codes 5xx (server errors)
-                        (hasattr(e, 'status') and e.status >= 500),
+                        # 🔧 FIXED: Bezpečnejšia kontrola HTTP status codes 5xx (server errors)
+                        (hasattr(e, 'status') and isinstance(getattr(e, 'status', None), int) and e.status >= 500),
                         # For network-level errors
                         "Connection" in str(e),
                         "Timeout" in str(e),
@@ -286,33 +286,33 @@ class ConcurrentRESTClient:
     
     def _prepare_url_and_params(self, url: str, path_params: Dict[str, str], 
                                query_params: Dict[str, str], user_params: Dict[str, Any]) -> tuple:
-        """Prepares URL with path parameters and query parameters"""
+        """🔧 FIXED: Prepares URL with path parameters and query parameters"""
+        import re
         
-        # First, merge path_params from config with user_params for path substitution
+        # 🔧 FIXED: Identifikuj ktoré user_params sú určené pre path substitution
+        path_placeholders = set()
+        for match in re.finditer(r'\{(\w+)\}', url):
+            path_placeholders.add(match.group(1))
+        
+        # 🔧 FIXED: Rozdeľ user_params na path a query
+        path_user_params = {k: v for k, v in user_params.items() if k in path_placeholders}
+        query_user_params = {k: v for k, v in user_params.items() if k not in path_placeholders}
+        
+        # Merge path params
         all_path_params = {}
         all_path_params.update(path_params)  # Default values from config
-        all_path_params.update(user_params)  # User-provided values override defaults
+        all_path_params.update(path_user_params)  # 🔧 FIXED: Len relevantné path params
         
-        # Replace {placeholders} in URL with path parameters
+        # Replace {placeholders} in URL
         final_url = self._substitute_placeholders(url, all_path_params)
         
-        # Prepare query parameters (never go into URL path)
+        # Prepare query parameters
         final_params = {}
-        
-        # Add configured query parameters first
         for key, value in query_params.items():
             final_params[key] = self._substitute_placeholders(str(value), user_params)
         
-        # Add additional query parameters from user_params 
-        # (but skip those that were used as path parameters)
-        used_path_keys = set()
-        for key in all_path_params.keys():
-            if f"{{{key}}}" in url:
-                used_path_keys.add(key)
-        
-        for key, value in user_params.items():
-            if key not in used_path_keys and key not in final_params:
-                final_params[key] = str(value)
+        # 🔧 FIXED: Add remaining user params as query params
+        final_params.update(query_user_params)
         
         return final_url, final_params
     
@@ -935,10 +935,10 @@ async def main():
                         notification_options=NotificationOptions(),
                         experimental_capabilities={}
                     ),
-                    protocol_version="2025-03-26"  # NEW: MCP Protocol version declaration
+                    protocol_version="2024-11-05"  # 🔧 FIXED: Unified MCP Protocol version
                 )
                 
-                print(f"🔌 INFO: MCP Server initialized with protocol version: 2025-03-26")
+                print(f"🔌 INFO: MCP Server initialized with protocol version: 2024-11-05")
                 await server.run(read_stream, write_stream, init_options)
     
     except Exception as e:

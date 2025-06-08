@@ -4,9 +4,9 @@
     "url": "https://api.opensubtitles.com/api/v1/subtitles",
     "description": "Search for subtitles by title and language",
     "query_params": {
-      "query": "{query}",
-      "languages": "{languages}",
-      "page": "{page}"
+      "query": "",
+      "languages": "en",
+      "page": "1"
     },
     "timeout": 30
   },

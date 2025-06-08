@@ -173,7 +173,7 @@ class MCPProcess:
                         "id": 0,
                         "method": "initialize",
                         "params": {
-                            "protocolVersion": "2025-03-26",
+                            "protocolVersion": "2024-11-05",
                             "capabilities": {
                                 "tools": {},
                                 "resources": {},
@@ -2140,13 +2140,15 @@ async def _streamable_send_initialize(session_id: str, server_name: str):
     try:
         logger.info(f"Streamable: Starting proper MCP initialization handshake for session {session_id}")
         
-        # FIXED: Check if underlying MCP server is properly initialized first
+        # 🔧 FIXED: Check if underlying MCP server is properly initialized first
         server_status = process_manager.get_server_status(server_name)
         if server_status.get("status") != "running":
             raise Exception(f"Server {server_name} is not running")
         
-        if not server_status.get("initialized", False):
-            raise Exception(f"Server {server_name} is not properly initialized - cannot create Streamable session")
+        # 🔧 FIXED: Správna kontrola initialization cez process manager
+        mcp_process = process_manager.processes.get(server_name)
+        if not mcp_process or not mcp_process.initialized:
+            raise Exception(f"Server {server_name} is not properly initialized")
         
         # FIXED: Use default capabilities for streamable (avoid server capabilities call)
         server_capabilities = {
