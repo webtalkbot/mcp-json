@@ -1,8 +1,18 @@
-.env
+# Python cache
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Data files
 /data/*
 !/data/
 !/data/.gitkeep
+
+# Logs
 /logs/*
 !/logs/
 !/logs/.gitkeep
+
+# Environment
+.env
