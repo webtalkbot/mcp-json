@@ -360,7 +360,7 @@ class ConcurrentRESTClient:
                 endpoint_headers = endpoint.get("headers", {})
                 # Separate handling for path_params and query_params
                 path_params = endpoint.get("path_params", {})
-                query_params = endpoint.get("params", endpoint.get("query_params", {}))
+                query_params = endpoint.get("query_params", endpoint.get("params", {}))
                 body_template = endpoint.get("body_template", "")
                 timeout = endpoint.get("timeout", 30)
                 
@@ -437,7 +437,8 @@ class ConcurrentRESTClient:
                     print(f"   Method: {method}")
                     print(f"   URL: {final_url}")
                     print(f"   Headers: {dict(headers)}")
-                    print(f"   Params: {final_params}")                    
+                    print(f"   Query params loaded: {query_params}")
+                    print(f"   Final params: {final_params}")                    
                     print(f"   Security: {'✅ Applied' if security_applied else '❌ None'}")
                     if cookies:
                         print(f"   Cookies: {len(cookies)} items")
