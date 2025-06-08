@@ -109,7 +109,7 @@ To use this software for commercial purposes, you must either:
   Organization: BELNEM s.r.o.
 
   Commercial License Pricing (based on annual revenue):
-  - $9 USD/year for newly incorporated companies (requires official incorporation documents proving company was established within the last 3 months from license application date) - automatically listed in public registry
+  - $9 USD for the first year only for newly incorporated companies (requires official incorporation documents proving the company was established within the last 3 months from license application date). After the first year, the license must be renewed based on current annual revenue as described below.
   - $99 USD/year for companies with annual revenue from $0 to $99,999.99 USD (10% discount if company agrees to be listed in public registry: $89.10)
   - $499 USD/year for companies with annual revenue from $100,000 to $999,999.99 USD (10% discount if company agrees to be listed in public registry: $449.10)
   - $999 USD/year for companies with annual revenue of $1,000,000 USD or more (10% discount if company agrees to be listed in public registry: $899.10)
