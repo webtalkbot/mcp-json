@@ -1,7 +1,7 @@
 Business Source License 1.1
 
 Licensed Work:          MCP JSON - MCP JSON Server Manager
-Licensor:               BELNEM s.r.o. (webtalkbot.com), Filip Dvoran (filip.dvoran@gmail.com)
+Licensor:               BELNEM s.r.o., Filip Dvoran (filip.dvoran@gmail.com)
 Software:               MCP JSON (all files in this repository)
 Use Limitation:         Commercial use requires a commercial license
 Change Date:            This license will not change automatically
@@ -105,8 +105,8 @@ COMMERCIAL LICENSE REQUIRED:
 To use this software for commercial purposes, you must either:
 1. Obtain a commercial license by contacting:
   Email: license@mcp-json.com
-  Website: mcp-json.com
-  Organization: BELNEM s.r.o. (webtalkbot.com)
+  Website: https://mcp-json.com
+  Organization: BELNEM s.r.o.
 
   Commercial License Pricing (based on annual revenue):
   - $9 USD/year for newly incorporated companies (requires official incorporation documents proving company was established within the last 3 months from license application date) - automatically listed in public registry
@@ -137,4 +137,4 @@ automatically convert to an open source license.
 
 The same licensing rights that BELNEM s.r.o. company has for licensing are also held by the software creator Filip Dvoran (filip.dvoran@gmail.com).
 
-Copyright (c) 2025 Webtalkbot. All rights reserved.
+Copyright (c) 2025 Belnem s.r.o. . All rights reserved.
