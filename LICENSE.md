@@ -77,11 +77,13 @@ This grant provides the following rights:
 3. REVOCATION BY CONTRIBUTOR VOTING: Special contributor privileges may be revoked 
   if a contributor acts against the project's interests, subject to the following 
   democratic process:
-  - The project owner may initiate a public vote on social media X (https://x.com/webtalkbot)
-  - Only votes from verified project contributors (those with approved commits on GitHub) will be counted
-  - A simple majority of contributing votes is required for revocation
-  - The voting period must remain open for at least 7 days
-  - The accused contributor has the right to respond publicly before the vote concludes
+  - The project owner may initiate a vote by creating a GitHub Issue in the project repository
+  - The issue must be labeled "contributor-vote" and remain open for at least 7 days
+  - Only GitHub users with merged pull requests in the project repository may vote
+  - Votes are cast by commenting "+1" (for revocation) or "-1" (against revocation)
+  - Each eligible contributor may vote only once
+  - A simple majority of votes cast is required for revocation
+  - The accused contributor has the right to respond in the issue before the vote concludes
   - Revocation takes effect immediately upon vote conclusion if majority is reached
 
 4. PUBLIC REGISTRY: Contributors who transfer, lease, or lend their special commercial 
@@ -89,15 +91,15 @@ This grant provides the following rights:
   https://github.com/webtalkbot/mcp-json/tree/main/enterprise
 
 SIGNIFICANT CONTRIBUTION CRITERIA:
-Every approved contribution on GitHub is automatically considered significant. 
-Any contributor who has an approved commit on GitHub is entitled to request 
-a Special Contributor Commercial License. This includes:
+Any approved contribution on GitHub is automatically considered significant. 
+Any contributor who has at least one (1) approved commit on GitHub is entitled 
+to request a Special Contributor Commercial License. This includes:
 - Any code contribution that extends the functionality of the application, approved by the Licensor via commits on GitHub
 - Any bug fixes that improve performance or functionality, approved by the Licensor via commits on GitHub
 - Any contribution to project documentation, approved by the Licensor via commits on GitHub
 - Any other approved changes to the project, approved by the Licensor via commits on GitHub
 
-All contributors with approved GitHub commits are automatically entitled to 
+All contributors with at least one approved GitHub commit are automatically entitled to 
 a Special Contributor Commercial License upon email request.
 
 Additional Use Grant: None
@@ -131,14 +133,13 @@ To use this software for commercial purposes, you must either:
   Website: https://mcp-json.com
   Organization: BELNEM s.r.o.
 
-  Commercial License Pricing (based on annual revenue):
+  Commercial License Pricing (based on self-reported annual revenue):
   - $9 USD for the first year only for newly incorporated companies (requires official incorporation documents proving the company was established within the last 3 months from license application date). After the first year, the license must be renewed based on current annual revenue as described below.
   - $99 USD/year for companies with annual revenue from $0 to $99,999.99 USD (10% discount if company agrees to be listed in public registry: $89.10)
   - $499 USD/year for companies with annual revenue from $100,000 to $999,999.99 USD (10% discount if company agrees to be listed in public registry: $449.10)
   - $999 USD/year for companies with annual revenue of $1,000,000 USD or more (10% discount if company agrees to be listed in public registry: $899.10)
   
-  Self-reported annual revenue. License holders may be asked to provide 
-  verification during audit.
+  Revenue reporting is based on good faith self-reporting by license holders.
 
 2. Be a significant contributor with a granted Special Contributor Commercial License
 
