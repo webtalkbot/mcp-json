@@ -1112,17 +1112,23 @@ async def main():
                         
                         # MCP Protocol version 2025-03-26 compliance
                         try:
+                            # 🔧 FIXED: Explicitly define capabilities as empty objects instead of using server.get_capabilities()
+                            explicit_capabilities = ServerCapabilities(
+                                tools=ToolsCapability(),
+                                resources=ResourcesCapability(),
+                                prompts=PromptsCapability(),
+                                logging=LoggingCapability()
+                            )
+                            
                             init_options = InitializationOptions(
                                 server_name="concurrent-config-mcp-server",
                                 server_version="1.0.0",
-                                capabilities=server.get_capabilities(
-                                    notification_options=NotificationOptions(),
-                                    experimental_capabilities={}
-                                ),
+                                capabilities=explicit_capabilities,
                                 protocol_version="2024-11-05"  # 🔧 FIXED: Unified MCP Protocol version
                             )
                             
-                            print(f"🔌 INFO: MCP Server initialized with protocol version: 2024-11-05")
+                            print(f"🔌 INFO: MCP Server initialized with explicit capabilities as empty objects")
+                            print(f"🔌 INFO: Protocol version: 2024-11-05")
                         except Exception as e:
                             error_msg = f"Failed to create initialization options: {e}"
                             print(f"❌ ERROR: {error_msg}")

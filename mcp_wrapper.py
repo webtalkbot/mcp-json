@@ -189,12 +189,12 @@ class MCPProcess:
                         "method": "initialize",
                         "params": {
                             "protocolVersion": "2024-11-05",
-                            "capabilities": {
-                                "tools": {},
-                                "resources": {},
-                                "prompts": {},
-                                "logging": {}
-                            },
+            "capabilities": {
+                "tools": {"version": "1.0.0"},
+                "resources": {"version": "1.0.0"},
+                "prompts": {"version": "1.0.0"},
+                "logging": {"version": "1.0.0"}
+            },
                             "clientInfo": {
                                 "name": "mcp-wrapper",
                                 "version": "1.0.0"
@@ -897,10 +897,10 @@ class EnhancedMCPTransport:
                 "initialized": False,
                 "protocol_version": "2025-03-26",
                 "capabilities": {
-                    "tools": True,
-                    "resources": True,
-                    "prompts": False,
-                    "logging": True
+                    "tools": {},
+                    "resources": {},
+                    "prompts": {},
+                    "logging": {}
                 }
             }
         
@@ -1233,10 +1233,10 @@ async def mcp_discovery():
             "version": "1.0.0",
             "protocol_version": "2025-03-26",
             "capabilities": {
-                "tools": True,
-                "resources": True,
-                "prompts": False,
-                "logging": True
+                "tools": {"version": "1.0.0"},
+                "resources": {"version": "1.0.0"},
+                "prompts": {"version": "1.0.0"},
+                "logging": {"version": "1.0.0"}
             },
             "transports": [
                 {
@@ -1321,10 +1321,10 @@ async def mcp_standard_get(request: Request):
                 "result": {
                     "protocolVersion": "2025-03-26",
                     "capabilities": {
-                        "tools": True,
-                        "resources": True,
-                        "prompts": False,
-                        "logging": True
+                        "tools": {"version": "1.0.0"},
+                        "resources": {"version": "1.0.0"},
+                        "prompts": {"version": "1.0.0"},
+                        "logging": {"version": "1.0.0"}
                     },
                     "serverInfo": {
                         "name": "mcp-server-manager",
@@ -1362,21 +1362,21 @@ async def mcp_standard_get(request: Request):
                         break
                     
                     # Send periodic server status updates
-                    current_servers = db.list_servers()
-                    current_running = [s for s in current_servers if s['status'] == 'running']
-                    
-                    status_update = {
-                        "jsonrpc": "2.0",
-                        "method": "notifications/server_status",
-                        "params": {
-                            "timestamp": time.time(),
-                            "servers_total": len(current_servers),
-                            "servers_running": len(current_running),
-                            "running_servers": [server['name'] for server in current_running]
-                        }
-                    }
-                    
-                    yield f"data: {json.dumps(status_update)}\n\n"
+                    # current_servers = db.list_servers()
+                    # current_running = [s for s in current_servers if s['status'] == 'running']
+                    # 
+                    # status_update = {
+                    #     "jsonrpc": "2.0",
+                    #     "method": "notifications/server_status",
+                    #     "params": {
+                    #         "timestamp": time.time(),
+                    #         "servers_total": len(current_servers),
+                    #         "servers_running": len(current_running),
+                    #         "running_servers": [server['name'] for server in current_running]
+                    #     }
+                    # }
+                    # 
+                    # yield f"data: {json.dumps(status_update)}\n\n"
                     
                     # Wait before next update
                     await asyncio.sleep(30)  # Update every 30 seconds
@@ -1485,11 +1485,11 @@ async def mcp_standard_post(request_data: dict, request: Request):
                 "result": {
                     "protocolVersion": "2025-03-26",
                     "capabilities": {
-                        "tools": True,
-                        "resources": True,
-                        "prompts": False,
-                        "logging": True,
-                        "session_management": True  # NEW: Indicate session support
+                        "tools": {"version": "1.0.0"},
+                        "resources": {"version": "1.0.0"},
+                        "prompts": {"version": "1.0.0"},
+                        "logging": {"version": "1.0.0"},
+                        "session_management": True  # NEW: Include session support
                     },
                     "serverInfo": {
                         "name": "mcp-server-manager",
@@ -1539,13 +1539,13 @@ async def mcp_standard_post(request_data: dict, request: Request):
                 "jsonrpc": "2.0",
                 "id": request_id,
                 "result": {
-                    "capabilities": {
-                        "tools": True,
-                        "resources": True,
-                        "prompts": False,
-                        "logging": True,
-                        "session_management": True  # NEW: Include session support
-                    },
+            "capabilities": {
+                "tools": {"version": "1.0.0"},
+                "resources": {"version": "1.0.0"},
+                "prompts": {"version": "1.0.0"},
+                "logging": {"version": "1.0.0"},
+                "session_management": True  # NEW: Include session support
+            },
                     "protocolVersion": "2025-03-26",
                     "serverInfo": {
                         "name": "mcp-server-manager",
@@ -1672,12 +1672,12 @@ async def mcp_standard_post(request_data: dict, request: Request):
 async def mcp_global_capabilities():
     """Global MCP capabilities"""
     return {
-        "capabilities": {
-            "tools": {},
-            "resources": {},
-            "prompts": {},
-            "logging": {}
-        },
+            "capabilities": {
+                "tools": {"version": "1.0.0"},
+                "resources": {"version": "1.0.0"},
+                "prompts": {"version": "1.0.0"},
+                "logging": {"version": "1.0.0"}
+            },
         "protocolVersion": "2025-03-26",
         "serverInfo": {
             "name": "mcp-server-manager",
@@ -2327,10 +2327,10 @@ async def streamable_mcp_transport_post(server_name: str, request_data: dict):
                 "result": {
                     "protocolVersion": "2025-03-26",
                     "capabilities": {
-                        "tools": {},
-                        "resources": {},
-                        "prompts": {},
-                        "logging": {}
+                        "tools": {"version": "1.0.0"},
+                        "resources": {"version": "1.0.0"},
+                        "prompts": {"version": "1.0.0"},
+                        "logging": {"version": "1.0.0"}
                     },
                     "serverInfo": {
                         "name": f"mcp-server-{server_name}",
@@ -2420,10 +2420,10 @@ async def _streamable_send_initialize(session_id: str, server_name: str):
         
         # FIXED: Use default capabilities for streamable (avoid server capabilities call)
         server_capabilities = {
-            "tools": {},
-            "resources": {},
-            "prompts": {},
-            "logging": {}
+            "tools": {"version": "1.0.0"},
+            "resources": {"version": "1.0.0"},
+            "prompts": {"version": "1.0.0"},
+            "logging": {"version": "1.0.0"}
         }
         server_info = {
             "name": f"mcp-server-{server_name}",
@@ -2680,10 +2680,10 @@ async def sse_mcp_transport_post(server_name: str, request_data: dict):
                 "result": {
                     "protocolVersion": "2025-03-26",
                     "capabilities": {
-                        "tools": {},
-                        "resources": {},
-                        "prompts": {},
-                        "logging": {}
+                        "tools": {"version": "1.0.0"},
+                        "resources": {"version": "1.0.0"},
+                        "prompts": {"version": "1.0.0"},
+                        "logging": {"version": "1.0.0"}
                     },
                     "serverInfo": {
                         "name": f"mcp-server-{server_name}",
@@ -2796,10 +2796,10 @@ async def _sse_send_initialize(session_id: str, server_name: str):
         
         # Use default capabilities for SSE (avoid server capabilities call)
         server_capabilities = {
-            "tools": {},
-            "resources": {},
-            "prompts": {},
-            "logging": {}
+            "tools": {"version": "1.0.0"},
+            "resources": {"version": "1.0.0"},
+            "prompts": {"version": "1.0.0"},
+            "logging": {"version": "1.0.0"}
         }
         server_info = {
             "name": f"mcp-server-{server_name}",
