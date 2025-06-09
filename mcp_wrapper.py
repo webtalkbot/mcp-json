@@ -14,7 +14,7 @@ import asyncio
 from typing import Dict, List, Optional
 from fastapi import FastAPI, HTTPException, Path, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from mcp_database import MCPDatabase
 import psutil
 import queue
@@ -25,6 +25,7 @@ from error_logger import (
     log_streamable_error, log_tools_list_error, log_tools_call_error,
     log_initialization_error, log_custom_error
 )
+
 
 # Load environment variables
 load_dotenv()
@@ -165,7 +166,7 @@ class MCPProcess:
                 self.process = None
             return False
     
-    async def _wait_for_initialization_async(self, timeout: int = 30):
+    async def _wait_for_initialization_async(self, timeout: int = 60):
         """FIXED: Proper MCP initialization handshake with capability negotiation"""
         start_time = time.time()
         init_sent = False
@@ -873,6 +874,124 @@ class StreamableSessionManager:
 # Global Streamable session manager
 streamable_manager = StreamableSessionManager()
 
+# 🆕 NEW: Enhanced MCP Transport using FastAPI MCP patterns
+class EnhancedMCPTransport:
+    """Enhanced MCP transport using FastAPI MCP patterns for better SSE and streamable support"""
+    
+    def __init__(self, process_manager: ProcessManager):
+        self.process_manager = process_manager
+        self.sessions: Dict[str, Dict] = {}
+        self.lock = asyncio.Lock()
+        
+    async def create_mcp_session(self, server_name: str, session_id: str = None) -> str:
+        """Create a new MCP session with proper initialization"""
+        if session_id is None:
+            session_id = str(uuid.uuid4())
+            
+        async with self.lock:
+            self.sessions[session_id] = {
+                "session_id": session_id,
+                "server_name": server_name,
+                "created_at": time.time(),
+                "last_activity": time.time(),
+                "initialized": False,
+                "protocol_version": "2025-03-26",
+                "capabilities": {
+                    "tools": True,
+                    "resources": True,
+                    "prompts": False,
+                    "logging": True
+                }
+            }
+        
+        logger.info(f"Enhanced MCP: Created session {session_id} for server {server_name}")
+        return session_id
+    
+    async def handle_mcp_message(self, session_id: str, message: dict) -> dict:
+        """Handle MCP message with proper protocol validation"""
+        try:
+            method = message.get("method")
+            params = message.get("params", {})
+            request_id = message.get("id")
+            
+            # Validate session
+            session = self.sessions.get(session_id)
+            if not session:
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {
+                        "code": -32001,
+                        "message": f"Invalid session: {session_id}"
+                    }
+                }
+            
+            # Update session activity
+            session["last_activity"] = time.time()
+            
+            # Handle initialization
+            if method == "initialize":
+                client_capabilities = params.get("capabilities", {})
+                client_info = params.get("clientInfo", {})
+                
+                session["initialized"] = True
+                session["client_info"] = client_info
+                
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "result": {
+                        "protocolVersion": session["protocol_version"],
+                        "capabilities": session["capabilities"],
+                        "serverInfo": {
+                            "name": f"mcp-server-{session['server_name']}",
+                            "version": "1.0.0"
+                        }
+                    }
+                }
+            
+            # Validate session is initialized for other requests
+            if not session["initialized"]:
+                return {
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {
+                        "code": -32002,
+                        "message": "Session not initialized"
+                    }
+                }
+            
+            # Forward request to MCP server
+            server_name = session["server_name"]
+            response = await self.process_manager.send_request_to_server(server_name, method, params)
+            
+            # Ensure response has correct ID
+            if request_id is not None:
+                response["id"] = request_id
+                
+            return response
+            
+        except Exception as e:
+            logger.error(f"Enhanced MCP: Error handling message: {e}")
+            return {
+                "jsonrpc": "2.0",
+                "id": message.get("id"),
+                "error": {
+                    "code": -32000,
+                    "message": f"Internal error: {str(e)}"
+                }
+            }
+    
+    async def cleanup_session(self, session_id: str):
+        """Clean up session"""
+        async with self.lock:
+            if session_id in self.sessions:
+                del self.sessions[session_id]
+                logger.info(f"Enhanced MCP: Cleaned up session {session_id}")
+
+# Global enhanced MCP transport
+enhanced_mcp_transport = EnhancedMCPTransport(process_manager)
+
 # 🆕 NEW: MCP Session Manager for proper session handling
 class MCPSessionManager:
     """Manager for MCP protocol sessions with proper Mcp-Session-Id header support"""
@@ -894,7 +1013,8 @@ class MCPSessionManager:
                 "request_count": 0,
                 "initialized": True
             }
-        logger.info(f"MCP Session: Created session {session_id} for client {client_info.get('name', 'unknown')}")
+        client_name = client_info.get('name', 'unknown') if client_info else 'unknown'
+        logger.info(f"MCP Session: Created session {session_id} for client {client_name}")
         return session_id
     
     async def validate_session(self, session_id: str) -> bool:
@@ -1355,7 +1475,8 @@ async def mcp_standard_post(request_data: dict, request: Request):
             # 🆕 NEW: Store session info
             await _store_mcp_session(session_id, client_info)
             
-            logger.info(f"MCP Standard: Initialize from client {client_info.get('name', 'unknown')} with session {session_id}")
+            client_name = client_info.get('name', 'unknown') if client_info else 'unknown'
+            logger.info(f"MCP Standard: Initialize from client {client_name} with session {session_id}")
             
             # 🆕 NEW: Return response with session header
             response = {
@@ -1412,7 +1533,7 @@ async def mcp_standard_post(request_data: dict, request: Request):
             # Update session activity
             await _update_session_activity(session_id)
         
-        elif method == "capabilities":
+        if method == "capabilities":
             # Return aggregated capabilities from all servers
             return {
                 "jsonrpc": "2.0",
@@ -1818,6 +1939,36 @@ async def send_request_to_server(server_name: str, request_data: dict):
     except Exception as e:
         logger.error(f"Error sending request: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/servers/{server_name}/warmup")
+async def warmup_server(server_name: str):
+    """Pre-warm server to ensure it's ready for tools/list"""
+    try:
+        # Check if server is running
+        mcp_process = process_manager.processes.get(server_name)
+        if not mcp_process or not mcp_process.is_running():
+            return {"status": "not_running", "message": f"Server {server_name} is not running"}
+        
+        if not mcp_process.initialized:
+            return {"status": "initializing", "message": f"Server {server_name} is still initializing"}
+        
+        # Test tools/list call
+        try:
+            response = await process_manager.send_request_to_server(server_name, "tools/list")
+            if "result" in response:
+                tools_count = len(response["result"].get("tools", []))
+                return {
+                    "status": "ready", 
+                    "message": f"Server {server_name} is ready",
+                    "tools_count": tools_count
+                }
+            else:
+                return {"status": "error", "message": f"Server {server_name} tools/list failed"}
+        except Exception as e:
+            return {"status": "error", "message": f"Server {server_name} warmup failed: {str(e)}"}
+            
+    except Exception as e:
+        return {"status": "error", "message": f"Warmup check failed: {str(e)}"}
 
 # Individual MCP HTTP Endpoints for each server
 async def _check_server_running(server_name: str):

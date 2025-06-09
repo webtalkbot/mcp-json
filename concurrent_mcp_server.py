@@ -612,198 +612,210 @@ print(f"✅ INFO: Registered {len(notification_types)} notification handlers")
 
 @server.list_tools()
 async def handle_list_tools() -> List[Tool]:
-    """Thread-safe generation of tools list"""
+    """Thread-safe generation of tools list with improved retry and warmup"""
     global config_manager
+    max_retries = 5  # Increased from 3
     
-    try:
-        print("📋 INFO: handle_list_tools() called")
-        
-        if not config_manager:
-            print("❌ ERROR: Config manager is not initialized")
-            return []
-        
-        tools = []
-        
-        # Basic tools for management
-        tools.extend([
-            Tool(
-                name="list_servers",
-                description="Shows all available MCP servers",
-                inputSchema={"type": "object", "properties": {}, "required": []}
-            ),
-            Tool(
-                name="list_endpoints",
-                description="Shows endpoints for specific server",
-                inputSchema={
-                    "type": "object",
-                    "properties": {                        
-                        "server_name": {"type": "string", "description": "Name of MCP server"}
-                    },
-                    "required": ["server_name"]
-                }
-            ),
-            Tool(
-                name="get_endpoint_details",
-                description="Shows details of specific endpoint",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "server_name": {"type": "string", "description": "Name of MCP server"},
-                        "endpoint_name": {"type": "string", "description": "Name of endpoint"}
-                    },
-                    "required": ["server_name", "endpoint_name"]
-                }
-            ),
-            Tool(
-                name="reload_server",
-                description="Reloads server configuration from files",
-                inputSchema={
-                    "type": "object",
-                    "properties": {                        
-                        "server_name": {"type": "string", "description": "Name of MCP server"}
-                    },
-                    "required": ["server_name"]
-                }
-            ),
-            Tool(
-                name="test_authentication",
-                description="Test authentication for specific server",
-                inputSchema={
-                    "type": "object",
-                    "properties": {                        
-                        "server_name": {"type": "string", "description": "Name of server to test"}
-                    },
-                    "required": ["server_name"]
-                }
-            ),
-            Tool(
-                name="list_auth_status",                
-                description="Shows authentication status for all servers",
-                inputSchema={"type": "object", "properties": {}, "required": []}
-            ),
-            Tool(
-                name="refresh_authentication",                
-                description="Refreshes authentication for specific server",
-                inputSchema={
-                    "type": "object",
-                    "properties": {                        
-                        "server_name": {"type": "string", "description": "Name of server"}
-                    },
-                    "required": ["server_name"]
-                }
-            ),
-            Tool(
-                name="security_providers",
-                description="Shows available security providers and their configurations",
-                inputSchema={"type": "object", "properties": {}, "required": []}
-            )
-        ])
-                
-        print(f"📋 INFO: Basic tools created: {len(tools)}")
-        
-        # 🔧 FIXED: Dynamic tools for each server and endpoint with better error handling
-        available_servers = []
+    for attempt in range(max_retries):
         try:
-            print("📋 INFO: Attempting to discover servers...")
-            available_servers = await config_manager.discover_servers()
-            print(f"📋 INFO: Found servers: {available_servers}")
-        except Exception as e:
-            print(f"❌ ERROR: Error discovering servers: {e}")
-            import traceback
-            print(f"❌ ERROR: Traceback: {traceback.format_exc()}")
-            return tools
-        
-        for server_name in available_servers:
-            print(f"📋 INFO: Processing server: {server_name}")
-            try:
-                print(f"📋 INFO: Loading endpoints for server {server_name}")
-                endpoints = await config_manager.get_all_endpoints_for_server(server_name)                
-                print(f"📋 INFO: Server {server_name} has endpoints: {list(endpoints.keys())}")
-                
-                # 🔧 FIXED: Safe iteration over endpoints
-                if not isinstance(endpoints, dict):
-                    print(f"❌ ERROR: Endpoints for {server_name} is not dict: {type(endpoints)}")
+            print(f"📋 INFO: handle_list_tools() called (attempt {attempt + 1}/{max_retries})")
+            
+            if not config_manager:
+                if attempt < max_retries - 1:
+                    print(f"⚠️ WARNING: Config manager is not initialized, retrying in 2s (attempt {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(2)  # Increased wait time
                     continue
-                
-                for endpoint_name, endpoint_config in endpoints.items():                    
-                    print(f"📋 INFO: Creating tool for endpoint {endpoint_name}")
-                    try:
-                        if not isinstance(endpoint_config, dict):                            
-                            print(f"❌ ERROR: Endpoint config for {endpoint_name} is not dict: {type(endpoint_config)}")
-                            continue
+                else:
+                    print("❌ ERROR: Config manager is not initialized after retries")
+                    return []
+            
+            # Wait for proper initialization
+            await asyncio.sleep(0.5)  # Small stabilization delay
+            
+            tools = []
+            
+            # Basic tools for management
+            tools.extend([
+                Tool(
+                    name="list_servers",
+                    description="Shows all available MCP servers",
+                    inputSchema={"type": "object", "properties": {}, "required": []}
+                ),
+                Tool(
+                    name="list_endpoints",
+                    description="Shows endpoints for specific server",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {                        
+                            "server_name": {"type": "string", "description": "Name of MCP server"}
+                        },
+                        "required": ["server_name"]
+                    }
+                ),
+                Tool(
+                    name="get_endpoint_details",
+                    description="Shows details of specific endpoint",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "server_name": {"type": "string", "description": "Name of MCP server"},
+                            "endpoint_name": {"type": "string", "description": "Name of endpoint"}
+                        },
+                        "required": ["server_name", "endpoint_name"]
+                    }
+                ),
+                Tool(
+                    name="reload_server",
+                    description="Reloads server configuration from files",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {                        
+                            "server_name": {"type": "string", "description": "Name of MCP server"}
+                        },
+                        "required": ["server_name"]
+                    }
+                ),
+                Tool(
+                    name="test_authentication",
+                    description="Test authentication for specific server",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {                        
+                            "server_name": {"type": "string", "description": "Name of server to test"}
+                        },
+                        "required": ["server_name"]
+                    }
+                ),
+                Tool(
+                    name="list_auth_status",                
+                    description="Shows authentication status for all servers",
+                    inputSchema={"type": "object", "properties": {}, "required": []}
+                ),
+                Tool(
+                    name="refresh_authentication",                
+                    description="Refreshes authentication for specific server",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {                        
+                            "server_name": {"type": "string", "description": "Name of server"}
+                        },
+                        "required": ["server_name"]
+                    }
+                ),
+                Tool(
+                    name="security_providers",
+                    description="Shows available security providers and their configurations",
+                    inputSchema={"type": "object", "properties": {}, "required": []}
+                )
+            ])
+            
+            print(f"📋 INFO: Basic tools created: {len(tools)}")
+            
+            # Dynamic tools with improved error handling
+            available_servers = []
+            try:
+                print("📋 INFO: Attempting to discover servers...")
+                available_servers = await config_manager.discover_servers()
+                print(f"📋 INFO: Found servers: {available_servers}")
+            except Exception as e:
+                print(f"❌ ERROR: Error discovering servers: {e}")
+                if attempt < max_retries - 1:
+                    print(f"🔄 RETRY: Retrying server discovery in 1s...")
+                    await asyncio.sleep(1)
+                    continue
+                else:
+                    print("❌ ERROR: Server discovery failed after all retries")
+                    return tools  # Return at least basic tools
+            
+            # Process each server with error handling
+            for server_name in available_servers:
+                print(f"📋 INFO: Processing server: {server_name}")
+                try:
+                    # Add delay between server processing
+                    await asyncio.sleep(0.1)
+                    
+                    endpoints = await config_manager.get_all_endpoints_for_server(server_name)
+                    print(f"📋 INFO: Server {server_name} has endpoints: {list(endpoints.keys())}")
+                    
+                    if not isinstance(endpoints, dict):
+                        print(f"❌ ERROR: Endpoints for {server_name} is not dict: {type(endpoints)}")
+                        continue
+                    
+                    for endpoint_name, endpoint_config in endpoints.items():
+                        try:
+                            if not isinstance(endpoint_config, dict):
+                                print(f"❌ ERROR: Endpoint config for {endpoint_name} is not dict")
+                                continue
                             
-                        method = endpoint_config.get("method", "GET")
-                        url = endpoint_config.get("url", "")
-                        description = endpoint_config.get("description", f"{method} {url}")
-                        
-                        # 🔧 FIXED: Validate critical fields
-                        if not method or not url:
-                            print(f"❌ ERROR: Missing method or URL for endpoint {endpoint_name}")
-                            continue
-                        
-                        # Creates schema for tool
-                        tool_schema = {
-                            "type": "object",
-                            "properties": {
-                                "params": {
+                            method = endpoint_config.get("method", "GET")
+                            url = endpoint_config.get("url", "")
+                            description = endpoint_config.get("description", f"{method} {url}")
+                            
+                            if not method or not url:
+                                print(f"❌ ERROR: Missing method or URL for endpoint {endpoint_name}")
+                                continue
+                            
+                            # Create tool schema
+                            tool_schema = {
+                                "type": "object",
+                                "properties": {
+                                    "params": {
+                                        "type": "object",
+                                        "description": "Parameters for URL and query string",
+                                        "default": {}
+                                    }
+                                },
+                                "required": []
+                            }
+                            
+                            if method.upper() in ["POST", "PUT", "PATCH"]:
+                                tool_schema["properties"]["data"] = {
                                     "type": "object",
-                                    "description": "Parametre pre URL a query string",
+                                    "description": "Data for request body",
                                     "default": {}
                                 }
-                            },
-                            "required": []
-                        }
-                        
-                        # Adds data parameter for POST/PUT/PATCH
-                        if method.upper() in ["POST", "PUT", "PATCH"]:
-                            tool_schema["properties"]["data"] = {
-                                "type": "object",                                
-                                "description": "Data for request body",
-                                "default": {}
-                            }
-                        
-                        # 🔧 FIXED: Safe tool creation with validation
-                        tool_name = f"{server_name}__{endpoint_name}"
-                        tool_description = f"[{server_name}] {description}"
-                        
-                        # Validate tool name and description
-                        if not tool_name or not tool_description:
-                            print(f"❌ ERROR: Invalid tool name or description for {endpoint_name}")
+                            
+                            tool_name = f"{server_name}__{endpoint_name}"
+                            tool_description = f"[{server_name}] {description}"
+                            
+                            if not tool_name or not tool_description:
+                                print(f"❌ ERROR: Invalid tool name or description for {endpoint_name}")
+                                continue
+                            
+                            tool = Tool(
+                                name=tool_name,
+                                description=tool_description,
+                                inputSchema=tool_schema
+                            )
+                            tools.append(tool)
+                            print(f"📋 INFO: Tool {tool_name} created successfully")
+                            
+                        except Exception as e:
+                            print(f"❌ ERROR: Error creating tool for endpoint {endpoint_name}: {e}")
                             continue
-                        
-                        tool = Tool(
-                            name=tool_name,
-                            description=tool_description,
-                            inputSchema=tool_schema
-                        )
-                        tools.append(tool)                        
-                        print(f"📋 INFO: Tool {tool_name} created successfully")
-                        
-                    except Exception as e:                        
-                        print(f"❌ ERROR: Error creating tool for endpoint {endpoint_name} in server {server_name}: {e}")
-                        import traceback
-                        print(f"❌ ERROR: Tool creation traceback: {traceback.format_exc()}")
-                        continue
-                        
-            except Exception as e:
-                print(f"❌ ERROR: Error loading endpoints for server {server_name}: {e}")
-                import traceback
-                print(f"❌ ERROR: Server processing traceback: {traceback.format_exc()}")
+                
+                except Exception as e:
+                    print(f"❌ ERROR: Error processing server {server_name}: {e}")
+                    continue
+            
+            print(f"📋 INFO: Total tools created: {len(tools)}")
+            return tools
+            
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"⚠️ WARNING: Tools list attempt {attempt + 1} failed, retrying in 2s: {e}")
+                await asyncio.sleep(2)  # Increased wait time
                 continue
-        
-        print(f"📋 INFO: Total tools created: {len(tools)}")
-        return tools
-        
-    except Exception as e:
-        print(f"❌ ERROR: Unexpected error in handle_list_tools: {e}")
-        # Return at least basic tools
-        return [
-            Tool(
-                name="list_servers",                
-                description="Shows all available MCP servers",
-                inputSchema={"type": "object", "properties": {}, "required": []}
-            )
-        ]
+            else:
+                print(f"❌ ERROR: Tools list failed after {max_retries} attempts: {e}")
+                # Return at least basic tools as fallback
+                return [
+                    Tool(
+                        name="list_servers",
+                        description="Shows all available MCP servers",
+                        inputSchema={"type": "object", "properties": {}, "required": []}
+                    )
+                ]
 
 @server.call_tool()
 async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.TextContent]:

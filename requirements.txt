@@ -1,9 +1,10 @@
 requests
 psutil
-mcp==1.1.0
+mcp
+fastapi-mcp
 aiohttp
 fastapi 
-uvicorn 
+uvicorn
 tenacity 
 aiolimiter
 aiofiles
