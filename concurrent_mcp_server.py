@@ -711,14 +711,40 @@ async def handle_list_tools() -> List[Tool]:
             
             print(f"📋 INFO: Basic tools created: {len(tools)}")
             
-            # Dynamic tools with improved error handling
+            # 🆕 NEW: Get active servers from mcp_wrapper.py instead of file discovery
             available_servers = []
             try:
-                print("📋 INFO: Attempting to discover servers...")
-                available_servers = await config_manager.discover_servers()
-                print(f"📋 INFO: Found servers: {available_servers}")
+                print("📋 INFO: Attempting to get active servers from mcp_wrapper...")
+                
+                # Query mcp_wrapper for active servers
+                import aiohttp
+                import json
+                
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get("http://localhost:8999/servers") as response:
+                            if response.status == 200:
+                                data = await response.json()
+                                # Extract only running servers
+                                running_servers = [
+                                    server["name"] for server in data.get("servers", [])
+                                    if server.get("status") == "running"
+                                ]
+                                available_servers = running_servers
+                                print(f"📋 INFO: Active servers from mcp_wrapper: {available_servers}")
+                            else:
+                                print(f"⚠️ WARNING: mcp_wrapper returned status {response.status}")
+                                # Fallback to file discovery
+                                available_servers = await config_manager.discover_servers()
+                                print(f"📋 INFO: Fallback - Found servers via file discovery: {available_servers}")
+                except Exception as e:
+                    print(f"⚠️ WARNING: Cannot connect to mcp_wrapper: {e}")
+                    # Fallback to file discovery
+                    available_servers = await config_manager.discover_servers()
+                    print(f"📋 INFO: Fallback - Found servers via file discovery: {available_servers}")
+                    
             except Exception as e:
-                print(f"❌ ERROR: Error discovering servers: {e}")
+                print(f"❌ ERROR: Error getting active servers: {e}")
                 if attempt < max_retries - 1:
                     print(f"🔄 RETRY: Retrying server discovery in 1s...")
                     await asyncio.sleep(1)
