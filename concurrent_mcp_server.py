@@ -4,7 +4,7 @@ concurrent_mcp_server.py - Thread-safe configuration MCP Server
 Optimized for high concurrency and multiple simultaneous users
 """
 
-import argparse # 🆕 NEW
+import argparse # NEW
 import asyncio
 import json
 import sys
@@ -22,14 +22,19 @@ import aiofiles
 import weakref
 from functools import wraps
 
-# MCP-safe logging
-MCP_MODE = not os.getenv('MCP_DEBUG', 'false').lower() == 'true'
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    print("INFO: .env file loaded", file=sys.stderr)
+except:
+    print("WARNING: .env not loaded", file=sys.stderr)
 
+# MCP-safe logging
 def safe_log(message):
     """Log message to stderr to avoid interfering with MCP JSON-RPC communication"""
-    if not MCP_MODE:
-        sys.stderr.write(f"{message}\n")
-        sys.stderr.flush()
+    import sys
+    sys.stderr.write(f"{message}\n")
+    sys.stderr.flush()
 
 try:
     from security_manager import get_security_manager
@@ -56,7 +61,7 @@ except ImportError as e:
     error_msg = f"Missing MCP library: {e}. Install: pip install mcp"
     sys.stderr.write(f"CRITICAL ERROR: {error_msg}\n")
 
-# 🆕 NEW: Argument parsing function
+# NEW: Argument parsing function
 def parse_arguments():
     """Parse command line arguments for server selection"""
     parser = argparse.ArgumentParser(
@@ -142,7 +147,7 @@ def http_retry(max_retries: int = 3, base_delay: float = 1.0, backoff_factor: fl
                         isinstance(e, aiohttp.ClientConnectorError),
                         isinstance(e, aiohttp.ServerTimeoutError),
                         isinstance(e, aiohttp.ServerDisconnectedError),
-                        # 🔧 FIXED: Bezpečnejšia kontrola HTTP status codes 5xx (server errors)
+                        # FIXED: Bezpečnejšia kontrola HTTP status codes 5xx (server errors)
                         (hasattr(e, 'status') and isinstance(getattr(e, 'status', None), int) and e.status >= 500),
                         # For network-level errors
                         "Connection" in str(e),
@@ -229,7 +234,7 @@ class ThreadSafeConfigManager:
     def __init__(self, config_dir: str = ".", cache_ttl: int = 300, allowed_servers: List[str] = None):
         self.config_dir = config_dir
         self.cache_ttl = cache_ttl
-        self.allowed_servers = allowed_servers  # 🆕 NEW: Filter for allowed servers
+        self.allowed_servers = allowed_servers  # NEW: Filter for allowed servers
         self._cache = {}
         self._cache_lock = None
         self._file_locks = {}
@@ -265,7 +270,7 @@ class ThreadSafeConfigManager:
                     # Checks if it has an endpoints file
                     endpoints_file = os.path.join(server_dir, f"{item}_endpoints.json")
                     if os.path.exists(endpoints_file):
-                        # 🆕 NEW: Apply server filtering
+                        # NEW: Apply server filtering
                         if self.allowed_servers is None or item in self.allowed_servers:
                             servers.append(item)
                         else:
@@ -382,22 +387,22 @@ class ConcurrentRESTClient:
     
     def _prepare_url_and_params(self, url: str, path_params: Dict[str, str], 
                                query_params: Dict[str, str], user_params: Dict[str, Any]) -> tuple:
-        """🔧 FIXED: Prepares URL with path parameters and query parameters"""
+        """FIXED: Prepares URL with path parameters and query parameters"""
         import re
         
-        # 🔧 FIXED: Identifikuj ktoré user_params sú určené pre path substitution
+        # FIXED: Identifikuj ktoré user_params sú určené pre path substitution
         path_placeholders = set()
         for match in re.finditer(r'\{(\w+)\}', url):
             path_placeholders.add(match.group(1))
         
-        # 🔧 FIXED: Rozdeľ user_params na path a query
+        # FIXED: Rozdeľ user_params na path a query
         path_user_params = {k: v for k, v in user_params.items() if k in path_placeholders}
         query_user_params = {k: v for k, v in user_params.items() if k not in path_placeholders}
         
         # Merge path params
         all_path_params = {}
         all_path_params.update(path_params)  # Default values from config
-        all_path_params.update(path_user_params)  # 🔧 FIXED: Len relevantné path params
+        all_path_params.update(path_user_params)  # FIXED: Len relevantné path params
         
         # Replace {placeholders} in URL
         final_url = self._substitute_placeholders(url, all_path_params)
@@ -407,7 +412,7 @@ class ConcurrentRESTClient:
         for key, value in query_params.items():
             final_params[key] = self._substitute_placeholders(str(value), user_params)
         
-        # 🔧 FIXED: Add remaining user params as query params
+        # FIXED: Add remaining user params as query params
         final_params.update(query_user_params)
         
         return final_url, final_params
@@ -608,7 +613,7 @@ class ConcurrentRESTClient:
                     "error_type": type(e).__name__
                 }
 
-# 🆕 NEW: Helper function for parsing arguments
+# NEW: Helper function for parsing arguments
 def extract_server_list_from_args(args) -> Optional[List[str]]:
     """Extract server list from parsed arguments"""
     if args.command != 'servers':
@@ -637,7 +642,7 @@ config_manager = None
 session = None
 server = Server("concurrent-config-mcp-server")
 
-# 🔧 FIXED: Add notification handler to prevent validation errors
+# FIXED: Add notification handler to prevent validation errors
 async def handle_notification(method: str, params: Optional[Dict] = None) -> None:
     """Handle MCP notifications (messages without id field)"""
     try:
@@ -813,7 +818,7 @@ async def handle_list_tools() -> List[Tool]:
                     )
                 )
             
-            # 🆕 NEW: Get active servers from mcp_wrapper.py instead of file discovery
+            # NEW: Get active servers from mcp_wrapper.py instead of file discovery
             available_servers = []
             try:
                 safe_log("INFO: Attempting to get active servers from mcp_wrapper...")
@@ -1149,14 +1154,14 @@ async def main():
     global session, config_manager
     
     try:
-        # 🆕 NEW: Parse command line arguments
+        # NEW: Parse command line arguments
         args = parse_arguments()
         selected_servers = extract_server_list_from_args(args)
         
         if selected_servers:
-            print(f"🎯 INFO: Loading only selected servers: {selected_servers}")
+            safe_log(f"INFO: Loading only selected servers: {selected_servers}")
         else:
-            print(f"🌐 INFO: Loading all available servers")
+            safe_log(f"INFO: Loading all available servers")
         
         # Gets directory where this script is located
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1166,7 +1171,7 @@ async def main():
         try:
             config_manager = ThreadSafeConfigManager(
                 config_dir=script_dir, 
-                allowed_servers=selected_servers  # 🆕 NEW: Pass selected servers
+                allowed_servers=selected_servers  # NEW: Pass selected servers
             )
             safe_log(f"INFO: Config manager created with server filtering")
         except Exception as e:
@@ -1252,7 +1257,7 @@ async def main():
                         
                         # MCP Protocol version 2025-03-26 compliance
                         try:
-                            # 🔧 FIXED: Explicitly define capabilities as empty objects instead of using server.get_capabilities()
+                            # FIXED: Explicitly define capabilities as empty objects instead of using server.get_capabilities()
                             explicit_capabilities = ServerCapabilities(
                                 tools=ToolsCapability(),
                                 resources=ResourcesCapability(),
@@ -1264,7 +1269,7 @@ async def main():
                                 server_name="concurrent-config-mcp-server",
                                 server_version="1.0.0",
                                 capabilities=explicit_capabilities,
-                                protocol_version="2024-11-05"  # 🔧 FIXED: Unified MCP Protocol version
+                                protocol_version="2024-11-05"  # FIXED: Unified MCP Protocol version
                             )
                             
                             safe_log(f"INFO: MCP Server initialized with explicit capabilities as empty objects")
