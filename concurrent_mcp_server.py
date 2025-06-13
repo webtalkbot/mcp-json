@@ -4,6 +4,7 @@ concurrent_mcp_server.py - Thread-safe configuration MCP Server
 Optimized for high concurrency and multiple simultaneous users
 """
 
+import argparse # 🆕 NEW
 import asyncio
 import json
 import sys
@@ -20,6 +21,16 @@ from concurrent.futures import ThreadPoolExecutor
 import aiofiles
 import weakref
 from functools import wraps
+
+# MCP-safe logging
+MCP_MODE = not os.getenv('MCP_DEBUG', 'false').lower() == 'true'
+
+def safe_log(message):
+    """Log message to stderr to avoid interfering with MCP JSON-RPC communication"""
+    if not MCP_MODE:
+        sys.stderr.write(f"{message}\n")
+        sys.stderr.flush()
+
 try:
     from security_manager import get_security_manager
 except ImportError:
@@ -43,7 +54,51 @@ try:
     from mcp.server.stdio import stdio_server
 except ImportError as e:
     error_msg = f"Missing MCP library: {e}. Install: pip install mcp"
-    sys.stderr.write(f"❌ CRITICAL ERROR: {error_msg}\n")
+    sys.stderr.write(f"CRITICAL ERROR: {error_msg}\n")
+
+# 🆕 NEW: Argument parsing function
+def parse_arguments():
+    """Parse command line arguments for server selection"""
+    parser = argparse.ArgumentParser(
+        description="Concurrent MCP Server with selective server loading",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python concurrent_mcp_server.py                                    # Load all servers
+  python concurrent_mcp_server.py servers --opensubtitles --coingecko  # Load only specified servers
+  python concurrent_mcp_server.py servers opensubtitles coingecko      # Alternative syntax
+        """
+    )
+    
+    # Subcommand for servers
+    subparsers = parser.add_subparsers(dest='command', help='Commands')
+    
+    # Servers subcommand
+    servers_parser = subparsers.add_parser('servers', help='Select specific servers to load')
+    servers_parser.add_argument(
+        'server_names', 
+        nargs='*', 
+        help='Names of servers to load (e.g., opensubtitles coingecko)'
+    )
+    
+    # Alternative: using flags
+    servers_parser.add_argument(
+        '--opensubtitles', 
+        action='store_true', 
+        help='Load OpenSubtitles server'
+    )
+    servers_parser.add_argument(
+        '--coingecko', 
+        action='store_true', 
+        help='Load CoinGecko server'
+    )
+    servers_parser.add_argument(
+        '--all', 
+        action='store_true', 
+        help='Load all available servers (default)'
+    )
+    
+    return parser.parse_args()
     
     # Log to error log if possible
     try:
@@ -98,7 +153,7 @@ def http_retry(max_retries: int = 3, base_delay: float = 1.0, backoff_factor: fl
                     if attempt < max_retries and any(retry_conditions):
                         # Exponential backoff with jitter
                         delay = base_delay * (backoff_factor ** attempt) + random.uniform(0, 0.5)
-                        print(f"🔄 HTTP retry attempt {attempt + 1}/{max_retries + 1} po {delay:.1f}s: {type(e).__name__}: {e}")
+                        safe_log(f"HTTP retry attempt {attempt + 1}/{max_retries + 1} po {delay:.1f}s: {type(e).__name__}: {e}")
                         await asyncio.sleep(delay)
                         continue
                     
@@ -133,7 +188,7 @@ class MCPServerConfig:
         
         # Checks existence of files
         if not os.path.exists(endpoints_file):
-            print(f"❌ ERROR: File {endpoints_file} does not exist")
+            safe_log(f"ERROR: File {endpoints_file} does not exist")
             return None
         
         try:
@@ -162,18 +217,19 @@ class MCPServerConfig:
             )
             
         except json.JSONDecodeError as e:
-            print(f"❌ ERROR: Error parsing JSON files for server{server_name}: {e}")
+            safe_log(f"ERROR: Error parsing JSON files for server{server_name}: {e}")
             return None
         except Exception as e:
-            print(f"❌ ERROR: Error loading server configuration {server_name}: {e}")
+            safe_log(f"ERROR: Error loading server configuration {server_name}: {e}")
             return None
 
 class ThreadSafeConfigManager:
     """Thread-safe management of MCP server configurations with caching"""
     
-    def __init__(self, config_dir: str = ".", cache_ttl: int = 300):
+    def __init__(self, config_dir: str = ".", cache_ttl: int = 300, allowed_servers: List[str] = None):
         self.config_dir = config_dir
-        self.cache_ttl = cache_ttl  # 5 minutes cache
+        self.cache_ttl = cache_ttl
+        self.allowed_servers = allowed_servers  # 🆕 NEW: Filter for allowed servers
         self._cache = {}
         self._cache_lock = None
         self._file_locks = {}
@@ -192,7 +248,7 @@ class ThreadSafeConfigManager:
         return self._file_locks[server_name]
     
     async def discover_servers(self) -> List[str]:
-        """Finds all available MCP servers in servers/ directory"""
+        """Finds all available MCP servers in servers/ directory with optional filtering"""
         loop = asyncio.get_event_loop()
         
         def _discover():
@@ -209,7 +265,11 @@ class ThreadSafeConfigManager:
                     # Checks if it has an endpoints file
                     endpoints_file = os.path.join(server_dir, f"{item}_endpoints.json")
                     if os.path.exists(endpoints_file):
-                        servers.append(item)
+                        # 🆕 NEW: Apply server filtering
+                        if self.allowed_servers is None or item in self.allowed_servers:
+                            servers.append(item)
+                        else:
+                            safe_log(f"INFO: Server '{item}' filtered out (not in allowed list)")
             
             return sorted(servers)
         
@@ -252,10 +312,10 @@ class ThreadSafeConfigManager:
                 if server_name in self._cache:
                     cached_config = self._cache[server_name]
                     if await self._is_cache_valid(server_name, cached_config):
-                        print(f"🔄 DEBUG: Using cache for server {server_name}")
+                        safe_log(f"DEBUG: Using cache for server {server_name}")
                         return cached_config
                     else:
-                        print(f"🔄 DEBUG: Cache for server {server_name} is invalid")
+                        safe_log(f"DEBUG: Cache for server {server_name} is invalid")
                         del self._cache[server_name]
             
             # Loads from files
@@ -264,7 +324,7 @@ class ThreadSafeConfigManager:
             if config:
                 async with self._cache_lock:
                     self._cache[server_name] = config
-                    print(f"🔄 DEBUG: Server {server_name} loaded and stored in cache")
+                    safe_log(f"DEBUG: Server {server_name} loaded and stored in cache")
             
             return config
     
@@ -291,6 +351,11 @@ class ThreadSafeConfigManager:
         """Returns headers for given server"""
         config = await self.load_server(server_name)
         return config.headers if config else {}
+
+    def set_allowed_servers(self, allowed_servers: List[str]):
+        """Update the list of allowed servers"""
+        self.allowed_servers = allowed_servers
+        safe_log(f"INFO: Allowed servers updated: {allowed_servers}")
 
 class ConcurrentRESTClient:
     """Concurrent REST client with connection pooling"""
@@ -403,9 +468,9 @@ class ConcurrentRESTClient:
                 try:
                     security_context = await self.security_manager.get_security_context(server_name)
                     security_applied = True
-                    print(f"🔒 DEBUG: Security context obtained for {server_name}")
+                    safe_log(f"DEBUG: Security context obtained for {server_name}")
                 except Exception as e:
-                    print(f"⚠️ WARNING: Security context not available for {server_name}: {e}")
+                    safe_log(f"WARNING: Security context not available for {server_name}: {e}")
                     from security_providers import SecurityContext
                     security_context = SecurityContext(headers={}, query_params={}, cookies={}, 
                                                      auth_data={'provider': 'fallback', 'error': str(e)})
@@ -426,9 +491,9 @@ class ConcurrentRESTClient:
                         headers = security_data['headers']
                         final_params = security_data['params']
                         cookies = security_data.get('cookies', {})
-                        print(f"🔒 DEBUG: Security applied for {server_name}: {len(security_context.headers)} headers")
+                        safe_log(f"DEBUG: Security applied for {server_name}: {len(security_context.headers)} headers")
                     except Exception as e:
-                        print(f"⚠️ WARNING: Error applying security for {server_name}: {e}")
+                        safe_log(f"WARNING: Error applying security for {server_name}: {e}")
                         security_applied = False
                 
                 # Prepares body
@@ -464,15 +529,15 @@ class ConcurrentRESTClient:
                 
                 if self._debug_calls.get(server_name, 0) < 3:
                     self._debug_calls[server_name] = self._debug_calls.get(server_name, 0) + 1
-                    print(f"🔍 Debug call #{self._debug_calls[server_name]} pre {server_name}:")
-                    print(f"   Method: {method}")
-                    print(f"   URL: {final_url}")
-                    print(f"   Headers: {dict(headers)}")
-                    print(f"   Query params loaded: {query_params}")
-                    print(f"   Final params: {final_params}")                    
-                    print(f"   Security: {'✅ Applied' if security_applied else '❌ None'}")
+                    safe_log(f"Debug call #{self._debug_calls[server_name]} pre {server_name}:")
+                    safe_log(f"   Method: {method}")
+                    safe_log(f"   URL: {final_url}")
+                    safe_log(f"   Headers: {dict(headers)}")
+                    safe_log(f"   Query params loaded: {query_params}")
+                    safe_log(f"   Final params: {final_params}")                    
+                    safe_log(f"   Security: {'Applied' if security_applied else 'None'}")
                     if cookies:
-                        print(f"   Cookies: {len(cookies)} items")
+                        safe_log(f"   Cookies: {len(cookies)} items")
                 
                 # Executes request
                 async with self.session.request(method, final_url, **kwargs) as response:
@@ -543,6 +608,30 @@ class ConcurrentRESTClient:
                     "error_type": type(e).__name__
                 }
 
+# 🆕 NEW: Helper function for parsing arguments
+def extract_server_list_from_args(args) -> Optional[List[str]]:
+    """Extract server list from parsed arguments"""
+    if args.command != 'servers':
+        return None  # Load all servers
+    
+    selected_servers = []
+    
+    # Method 1: Positional arguments
+    if args.server_names:
+        selected_servers.extend(args.server_names)
+    
+    # Method 2: Flag-based selection
+    if args.opensubtitles:
+        selected_servers.append('opensubtitles')
+    if args.coingecko:
+        selected_servers.append('coingecko')
+    
+    # If --all is specified or no servers selected, return None (load all)
+    if args.all or not selected_servers:
+        return None
+    
+    return selected_servers
+
 # Thread-safe global variables
 config_manager = None
 session = None
@@ -552,20 +641,20 @@ server = Server("concurrent-config-mcp-server")
 async def handle_notification(method: str, params: Optional[Dict] = None) -> None:
     """Handle MCP notifications (messages without id field)"""
     try:
-        print(f"📨 INFO: Received notification: {method}")
+        safe_log(f"INFO: Received notification: {method}")
         
         if method == "notifications/initialized":
-            print("✅ INFO: Client initialized notification received")
+            safe_log("INFO: Client initialized notification received")
             # No action needed for initialized notification
             return
         elif method.startswith("notifications/"):
-            print(f"📨 INFO: Notification {method} processed")
+            safe_log(f"INFO: Notification {method} processed")
             return
         else:
-            print(f"⚠️ WARNING: Unknown notification method: {method}")
+            safe_log(f"WARNING: Unknown notification method: {method}")
             
     except Exception as e:
-        print(f"❌ ERROR: Error handling notification {method}: {e}")
+        safe_log(f"ERROR: Error handling notification {method}: {e}")
         try:
             from error_logger import log_custom_error
             log_custom_error("ERROR", "NOTIFICATION_HANDLER_ERROR", "concurrent_mcp_server", 
@@ -580,19 +669,19 @@ async def handle_notification(method: str, params: Optional[Dict] = None) -> Non
 async def universal_notification_handler(method: str, params: Optional[Dict] = None) -> None:
     """Universal handler for all MCP notifications"""
     try:
-        print(f"📨 INFO: Received notification: {method}")
+        safe_log(f"INFO: Received notification: {method}")
         
         if method == "notifications/initialized":
-            print("✅ INFO: Client initialized notification received")
+            safe_log("INFO: Client initialized notification received")
             return
         elif method.startswith("notifications/"):
-            print(f"📨 INFO: Notification {method} processed")
+            safe_log(f"INFO: Notification {method} processed")
             return
         else:
-            print(f"⚠️ WARNING: Unknown notification method: {method}")
+            safe_log(f"WARNING: Unknown notification method: {method}")
             
     except Exception as e:
-        print(f"❌ ERROR: Error handling notification {method}: {e}")
+        safe_log(f"ERROR: Error handling notification {method}: {e}")
 
 # Register all known notification types
 notification_types = [
@@ -608,25 +697,25 @@ notification_types = [
 for notification_type in notification_types:
     server.notification_handlers[notification_type] = universal_notification_handler
 
-print(f"✅ INFO: Registered {len(notification_types)} notification handlers")
+safe_log(f"INFO: Registered {len(notification_types)} notification handlers")
 
 @server.list_tools()
 async def handle_list_tools() -> List[Tool]:
-    """Thread-safe generation of tools list with improved retry and warmup"""
+    """Thread-safe generation of tools list with server filtering support"""
     global config_manager
     max_retries = 5  # Increased from 3
     
     for attempt in range(max_retries):
         try:
-            print(f"📋 INFO: handle_list_tools() called (attempt {attempt + 1}/{max_retries})")
+            safe_log(f"INFO: handle_list_tools() called (attempt {attempt + 1}/{max_retries})")
             
             if not config_manager:
                 if attempt < max_retries - 1:
-                    print(f"⚠️ WARNING: Config manager is not initialized, retrying in 2s (attempt {attempt + 1}/{max_retries})")
+                    safe_log(f"WARNING: Config manager is not initialized, retrying in 2s (attempt {attempt + 1}/{max_retries})")
                     await asyncio.sleep(2)  # Increased wait time
                     continue
                 else:
-                    print("❌ ERROR: Config manager is not initialized after retries")
+                    safe_log("ERROR: Config manager is not initialized after retries")
                     return []
             
             # Wait for proper initialization
@@ -709,12 +798,25 @@ async def handle_list_tools() -> List[Tool]:
                 )
             ])
             
-            print(f"📋 INFO: Basic tools created: {len(tools)}")
+            safe_log(f"INFO: Basic tools created: {len(tools)}")
+
+            # Add info about filtering to basic tools
+            if config_manager.allowed_servers:
+                safe_log(f"INFO: Server filtering active: {config_manager.allowed_servers}")
+                
+                # Add a tool to show current filter
+                tools.append(
+                    Tool(
+                        name="show_server_filter",
+                        description=f"Shows current server filter: {', '.join(config_manager.allowed_servers)}",
+                        inputSchema={"type": "object", "properties": {}, "required": []}
+                    )
+                )
             
             # 🆕 NEW: Get active servers from mcp_wrapper.py instead of file discovery
             available_servers = []
             try:
-                print("📋 INFO: Attempting to get active servers from mcp_wrapper...")
+                safe_log("INFO: Attempting to get active servers from mcp_wrapper...")
                 
                 # Query mcp_wrapper for active servers
                 import aiohttp
@@ -731,46 +833,46 @@ async def handle_list_tools() -> List[Tool]:
                                     if server.get("status") == "running"
                                 ]
                                 available_servers = running_servers
-                                print(f"📋 INFO: Active servers from mcp_wrapper: {available_servers}")
+                                safe_log(f"INFO: Active servers from mcp_wrapper: {available_servers}")
                             else:
-                                print(f"⚠️ WARNING: mcp_wrapper returned status {response.status}")
+                                safe_log(f"WARNING: mcp_wrapper returned status {response.status}")
                                 # Fallback to file discovery
                                 available_servers = await config_manager.discover_servers()
-                                print(f"📋 INFO: Fallback - Found servers via file discovery: {available_servers}")
+                                safe_log(f"INFO: Fallback - Found servers via file discovery: {available_servers}")
                 except Exception as e:
-                    print(f"⚠️ WARNING: Cannot connect to mcp_wrapper: {e}")
+                    safe_log(f"WARNING: Cannot connect to mcp_wrapper: {e}")
                     # Fallback to file discovery
                     available_servers = await config_manager.discover_servers()
-                    print(f"📋 INFO: Fallback - Found servers via file discovery: {available_servers}")
+                    safe_log(f"INFO: Fallback - Found servers via file discovery: {available_servers}")
                     
             except Exception as e:
-                print(f"❌ ERROR: Error getting active servers: {e}")
+                safe_log(f"ERROR: Error getting active servers: {e}")
                 if attempt < max_retries - 1:
-                    print(f"🔄 RETRY: Retrying server discovery in 1s...")
+                    safe_log(f"RETRY: Retrying server discovery in 1s...")
                     await asyncio.sleep(1)
                     continue
                 else:
-                    print("❌ ERROR: Server discovery failed after all retries")
+                    safe_log("ERROR: Server discovery failed after all retries")
                     return tools  # Return at least basic tools
             
             # Process each server with error handling
             for server_name in available_servers:
-                print(f"📋 INFO: Processing server: {server_name}")
+                safe_log(f"INFO: Processing server: {server_name}")
                 try:
                     # Add delay between server processing
                     await asyncio.sleep(0.1)
                     
                     endpoints = await config_manager.get_all_endpoints_for_server(server_name)
-                    print(f"📋 INFO: Server {server_name} has endpoints: {list(endpoints.keys())}")
+                    safe_log(f"INFO: Server {server_name} has endpoints: {list(endpoints.keys())}")
                     
                     if not isinstance(endpoints, dict):
-                        print(f"❌ ERROR: Endpoints for {server_name} is not dict: {type(endpoints)}")
+                        safe_log(f"ERROR: Endpoints for {server_name} is not dict: {type(endpoints)}")
                         continue
                     
                     for endpoint_name, endpoint_config in endpoints.items():
                         try:
                             if not isinstance(endpoint_config, dict):
-                                print(f"❌ ERROR: Endpoint config for {endpoint_name} is not dict")
+                                safe_log(f"ERROR: Endpoint config for {endpoint_name} is not dict")
                                 continue
                             
                             method = endpoint_config.get("method", "GET")
@@ -778,7 +880,7 @@ async def handle_list_tools() -> List[Tool]:
                             description = endpoint_config.get("description", f"{method} {url}")
                             
                             if not method or not url:
-                                print(f"❌ ERROR: Missing method or URL for endpoint {endpoint_name}")
+                                safe_log(f"ERROR: Missing method or URL for endpoint {endpoint_name}")
                                 continue
                             
                             # Create tool schema
@@ -805,7 +907,7 @@ async def handle_list_tools() -> List[Tool]:
                             tool_description = f"[{server_name}] {description}"
                             
                             if not tool_name or not tool_description:
-                                print(f"❌ ERROR: Invalid tool name or description for {endpoint_name}")
+                                safe_log(f"ERROR: Invalid tool name or description for {endpoint_name}")
                                 continue
                             
                             tool = Tool(
@@ -814,26 +916,26 @@ async def handle_list_tools() -> List[Tool]:
                                 inputSchema=tool_schema
                             )
                             tools.append(tool)
-                            print(f"📋 INFO: Tool {tool_name} created successfully")
+                            safe_log(f"INFO: Tool {tool_name} created successfully")
                             
                         except Exception as e:
-                            print(f"❌ ERROR: Error creating tool for endpoint {endpoint_name}: {e}")
+                            safe_log(f"ERROR: Error creating tool for endpoint {endpoint_name}: {e}")
                             continue
                 
                 except Exception as e:
-                    print(f"❌ ERROR: Error processing server {server_name}: {e}")
+                    safe_log(f"ERROR: Error processing server {server_name}: {e}")
                     continue
             
-            print(f"📋 INFO: Total tools created: {len(tools)}")
+            safe_log(f"INFO: Total tools created: {len(tools)}")
             return tools
             
         except Exception as e:
             if attempt < max_retries - 1:
-                print(f"⚠️ WARNING: Tools list attempt {attempt + 1} failed, retrying in 2s: {e}")
+                safe_log(f"WARNING: Tools list attempt {attempt + 1} failed, retrying in 2s: {e}")
                 await asyncio.sleep(2)  # Increased wait time
                 continue
             else:
-                print(f"❌ ERROR: Tools list failed after {max_retries} attempts: {e}")
+                safe_log(f"ERROR: Tools list failed after {max_retries} attempts: {e}")
                 # Return at least basic tools as fallback
                 return [
                     Tool(
@@ -849,7 +951,7 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
     global session, config_manager
     
     if not session or not config_manager:
-        return [types.TextContent(type="text", text="❌ Server is not properly initialized")]
+        return [types.TextContent(type="text", text="Server is not properly initialized")]
     
     # Uses the same security manager as in main()
     security_manager = get_security_manager(config_manager.config_dir)
@@ -860,9 +962,9 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
             servers = await config_manager.discover_servers()
             
             if not servers:
-                return [types.TextContent(type="text", text="📭 No MCP servers are configured\n\nCreate files in format: {name}_endpoints.json")]
+                return [types.TextContent(type="text", text="No MCP servers are configured\n\nCreate files in format: {name}_endpoints.json")]
             
-            output = "🖥️ **Available MCP servers:**\n\n"
+            output = "**Available MCP servers:**\n\n"
             
             for server_name in servers:
                 config = await config_manager.load_server(server_name)
@@ -870,11 +972,11 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
                     endpoint_count = len(config.endpoints)
                     header_count = len(config.headers)
                     output += f"**{server_name}**\n"
-                    output += f"   📋 Endpoints: {endpoint_count}\n"
-                    output += f"   🔑 Headers: {header_count}\n"
-                    output += f"   📁 Files: {server_name}_endpoints.json, {server_name}_headers.json\n\n"
+                    output += f"   Endpoints: {endpoint_count}\n"
+                    output += f"   Headers: {header_count}\n"
+                    output += f"   Files: {server_name}_endpoints.json, {server_name}_headers.json\n\n"
                 else:
-                    output += f"**{server_name}** ❌ (configuration error)\n\n"
+                    output += f"**{server_name}** (configuration error)\n\n"
             
             return [types.TextContent(type="text", text=output)]
         
@@ -883,9 +985,9 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
             endpoints = await config_manager.get_all_endpoints_for_server(server_name)
             
             if not endpoints:
-                return [types.TextContent(type="text", text=f"❌ Server '{server_name}' not found or has no endpoints")]
+                return [types.TextContent(type="text", text=f"Server '{server_name}' not found or has no endpoints")]
             
-            output = f"📋 **Endpoints for server '{server_name}':**\n\n"
+            output = f"**Endpoints for server '{server_name}':**\n\n"
             
             for endpoint_name, endpoint_config in endpoints.items():
                 method = endpoint_config.get("method", "GET")
@@ -893,10 +995,10 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
                 description = endpoint_config.get("description", "")
                 
                 output += f"**{endpoint_name}**\n"
-                output += f"   🔗 {method} {url}\n"
+                output += f"   {method} {url}\n"
                 if description:
-                    output += f"   📝 {description}\n"
-                output += f"   🛠️ Tool: `{server_name}__{endpoint_name}`\n\n"
+                    output += f"   {description}\n"
+                output += f"   Tool: `{server_name}__{endpoint_name}`\n\n"
             
             return [types.TextContent(type="text", text=output)]
         
@@ -906,10 +1008,10 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
             
             config = await config_manager.load_server(server_name)
             if not config or endpoint_name not in config.endpoints:                
-                return [types.TextContent(type="text", text=f"❌ Endpoint '{endpoint_name}' not found in server '{server_name}'")]
+                return [types.TextContent(type="text", text=f"Endpoint '{endpoint_name}' not found in server '{server_name}'")]
             endpoint = config.endpoints[endpoint_name]
             
-            output = f"🔍 **Endpoint details '{endpoint_name}' (server: {server_name}):**\n\n"
+            output = f"**Endpoint details '{endpoint_name}' (server: {server_name}):**\n\n"
             output += f"**Method:** {endpoint.get('method', 'GET')}\n"
             output += f"**URL:** {endpoint.get('url', 'N/A')}\n"
             output += f"**Description:** {endpoint.get('description', 'N/A')}\n"
@@ -935,15 +1037,15 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
             
             if config:
                 endpoint_count = len(config.endpoints)
-                return [types.TextContent(type="text", text=f"✅ Server '{server_name}' was reloaded ({endpoint_count} endpoints)")]
+                return [types.TextContent(type="text", text=f"Server '{server_name}' was reloaded ({endpoint_count} endpoints)")]
             else:
-                return [types.TextContent(type="text", text=f"❌ Error loading server '{server_name}'")]
+                return [types.TextContent(type="text", text=f"Error loading server '{server_name}'")]
         
         elif "__" in name:
             # Dynamic endpoint call
             parts = name.split("__", 1)
             if len(parts) != 2:
-                return [types.TextContent(type="text", text="❌ Invalid tool name format")]
+                return [types.TextContent(type="text", text="Invalid tool name format")]
             
             server_name, endpoint_name = parts
             params = arguments.get("params", {})
@@ -952,9 +1054,9 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
             result = await client.call_endpoint(server_name, endpoint_name, params, data)
             
             if "error" in result:
-                return [types.TextContent(type="text", text=f"❌ **Error:** {result['error']}\n\n**Response time:** {result.get('response_time', 0):.2f}s")]
+                return [types.TextContent(type="text", text=f"**Error:** {result['error']}\n\n**Response time:** {result.get('response_time', 0):.2f}s")]
             
-            output = f"✅ **{server_name}__{endpoint_name} - Successful response**\n\n"
+            output = f"**{server_name}__{endpoint_name} - Successful response**\n\n"
             output += f"**Status:** {result['status']}\n"
             output += f"**Method:** {result['method']}\n"
             output += f"**URL:** {result['url']}\n"
@@ -977,17 +1079,17 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
             success = await client.security_manager.test_authentication(server_name)
             
             if success:                
-                return [types.TextContent(type="text", text=f"✅ Authentication for server '{server_name}' is functional")]
+                return [types.TextContent(type="text", text=f"Authentication for server '{server_name}' is functional")]
             else:
-                return [types.TextContent(type="text", text=f"❌ Authentication for server '{server_name}' failed")]
+                return [types.TextContent(type="text", text=f"Authentication for server '{server_name}' failed")]
 
         elif name == "list_auth_status":
             status_list = await client.security_manager.list_servers_auth_status()
             
             if not status_list:
-                return [types.TextContent(type="text", text="📭 No servers with authentication found")]
+                return [types.TextContent(type="text", text="No servers with authentication found")]
             
-            output = "🔐 **Server authentication status:**\n\n"
+            output = "**Server authentication status:**\n\n"
             
             for status in status_list:
                 server_name = status["server_name"]
@@ -996,17 +1098,17 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
                 last_auth = status["last_auth_time"]
                 error = status["error"]
                 
-                status_icon = "✅" if authenticated else "❌"
+                status_icon = "Authenticated" if authenticated else "Not authenticated"
                 
                 output += f"**{server_name}**\n"
-                output += f"   {status_icon} Typ: {provider_type}\n"
-                output += f"   📊 Status: {'Authenticated' if authenticated else 'Not authenticated'}\n"
+                output += f"   Typ: {provider_type}\n"
+                output += f"   Status: {'Authenticated' if authenticated else 'Not authenticated'}\n"
                 
                 if last_auth:
-                    output += f"   🕐 Last authentication: {last_auth}\n"
+                    output += f"   Last authentication: {last_auth}\n"
                 
                 if error:
-                    output += f"   ⚠️ Error: {error}\n"
+                    output += f"   Error: {error}\n"
                 
                 output += "\n"
             
@@ -1018,14 +1120,14 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
             success = await client.security_manager.refresh_authentication(server_name)
             
             if success:
-                return [types.TextContent(type="text", text=f"✅ Authentication for server '{server_name}' refreshed")]
+                return [types.TextContent(type="text", text=f"Authentication for server '{server_name}' refreshed")]
             else:
-                return [types.TextContent(type="text", text=f"❌ Authentication refresh for server '{server_name}' failed")]
+                return [types.TextContent(type="text", text=f"Authentication refresh for server '{server_name}' failed")]
             
         elif name == "security_providers":
             providers = client.security_manager.get_available_providers()
             
-            output = "🔒 **Available Security Providers:**\n\n"
+            output = "**Available Security Providers:**\n\n"
             
             for provider_type in providers:
                 template = client.security_manager.get_provider_config_template(provider_type)
@@ -1036,28 +1138,40 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
             return [types.TextContent(type="text", text=output)]
 
         else:
-            return [types.TextContent(type="text", text=f"❌ Unknown tool: {name}")]
+            return [types.TextContent(type="text", text=f"Unknown tool: {name}")]
     
     except Exception as e:
-        print(f"❌ ERROR: Error executing tool '{name}': {e}")
-        return [types.TextContent(type="text", text=f"❌ Unexpected error: {str(e)}")]
+        safe_log(f"ERROR: Error executing tool '{name}': {e}")
+        return [types.TextContent(type="text", text=f"Unexpected error: {str(e)}")]
 
 async def main():
-    """Thread-safe main function with security manager and robust error handling"""
+    """Thread-safe main function with selective server loading"""
     global session, config_manager
     
     try:
+        # 🆕 NEW: Parse command line arguments
+        args = parse_arguments()
+        selected_servers = extract_server_list_from_args(args)
+        
+        if selected_servers:
+            print(f"🎯 INFO: Loading only selected servers: {selected_servers}")
+        else:
+            print(f"🌐 INFO: Loading all available servers")
+        
         # Gets directory where this script is located
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        print(f"📁 INFO: Script directory: {script_dir}")
+        safe_log(f"INFO: Script directory: {script_dir}")
         
-        # Creates thread-safe config manager
+        # Creates thread-safe config manager with server filtering
         try:
-            config_manager = ThreadSafeConfigManager(config_dir=script_dir)
-            print(f"✅ INFO: Config manager created successfully")
+            config_manager = ThreadSafeConfigManager(
+                config_dir=script_dir, 
+                allowed_servers=selected_servers  # 🆕 NEW: Pass selected servers
+            )
+            safe_log(f"INFO: Config manager created with server filtering")
         except Exception as e:
             error_msg = f"Failed to create config manager: {e}"
-            print(f"❌ ERROR: {error_msg}")
+            safe_log(f"ERROR: {error_msg}")
             try:
                 from error_logger import log_custom_error
                 log_custom_error("CRITICAL", "CONFIG_MANAGER_ERROR", "concurrent_mcp_server", 
@@ -1078,10 +1192,10 @@ async def main():
             )
             
             timeout = aiohttp.ClientTimeout(total=30, connect=10, sock_read=30)
-            print(f"✅ INFO: HTTP connector and timeout configured")
+            safe_log(f"INFO: HTTP connector and timeout configured")
         except Exception as e:
             error_msg = f"Failed to create HTTP connector: {e}"
-            print(f"❌ ERROR: {error_msg}")
+            safe_log(f"ERROR: {error_msg}")
             try:
                 from error_logger import log_custom_error
                 log_custom_error("CRITICAL", "HTTP_CONNECTOR_ERROR", "concurrent_mcp_server", 
@@ -1097,16 +1211,16 @@ async def main():
                 connector=connector
             ) as http_session:
                 session = http_session
-                print(f"✅ INFO: HTTP session started")
+                safe_log(f"INFO: HTTP session started")
                 
                 # Initialize security manager
                 try:
                     security_manager = get_security_manager(script_dir)
                     await security_manager.initialize(http_session)
-                    print(f"✅ INFO: Security manager initialized")
+                    safe_log(f"INFO: Security manager initialized")
                 except Exception as e:
                     error_msg = f"Security manager initialization failed: {e}"
-                    print(f"⚠️ WARNING: {error_msg}")
+                    safe_log(f"WARNING: {error_msg}")
                     try:
                         from error_logger import log_custom_error
                         log_custom_error("WARNING", "SECURITY_INIT_ERROR", "concurrent_mcp_server", 
@@ -1118,11 +1232,11 @@ async def main():
                 # Discover servers
                 try:
                     servers = await config_manager.discover_servers()
-                    print(f"🚀 INFO: Concurrent Config MCP Server started")
-                    print(f"📋 INFO: Found {len(servers)} servers: {servers}")
+                    safe_log(f"INFO: Concurrent Config MCP Server started")
+                    safe_log(f"INFO: Found {len(servers)} servers: {servers}")
                 except Exception as e:
                     error_msg = f"Server discovery failed: {e}"
-                    print(f"⚠️ WARNING: {error_msg}")
+                    safe_log(f"WARNING: {error_msg}")
                     try:
                         from error_logger import log_custom_error
                         log_custom_error("WARNING", "SERVER_DISCOVERY_ERROR", "concurrent_mcp_server", 
@@ -1134,7 +1248,7 @@ async def main():
                 # Start MCP server
                 try:
                     async with stdio_server() as (read_stream, write_stream):
-                        print(f"✅ INFO: stdio_server started")
+                        safe_log(f"INFO: stdio_server started")
                         
                         # MCP Protocol version 2025-03-26 compliance
                         try:
@@ -1153,11 +1267,11 @@ async def main():
                                 protocol_version="2024-11-05"  # 🔧 FIXED: Unified MCP Protocol version
                             )
                             
-                            print(f"🔌 INFO: MCP Server initialized with explicit capabilities as empty objects")
-                            print(f"🔌 INFO: Protocol version: 2024-11-05")
+                            safe_log(f"INFO: MCP Server initialized with explicit capabilities as empty objects")
+                            safe_log(f"INFO: Protocol version: 2024-11-05")
                         except Exception as e:
                             error_msg = f"Failed to create initialization options: {e}"
-                            print(f"❌ ERROR: {error_msg}")
+                            safe_log(f"ERROR: {error_msg}")
                             try:
                                 from error_logger import log_custom_error
                                 log_custom_error("CRITICAL", "INIT_OPTIONS_ERROR", "concurrent_mcp_server", 
@@ -1168,16 +1282,16 @@ async def main():
                         
                         # Run the server
                         try:
-                            print(f"🚀 INFO: Starting MCP server.run()...")
+                            safe_log(f"INFO: Starting MCP server.run()...")
                             await server.run(read_stream, write_stream, init_options)
                         except Exception as e:
                             error_msg = f"MCP server.run() failed: {e}"
-                            print(f"❌ ERROR: {error_msg}")
+                            safe_log(f"ERROR: {error_msg}")
                             
                             # Check if this is the notifications/initialized validation error
                             if "notifications/initialized" in str(e) and "ValidationError" in str(e):
-                                print(f"🔧 DETECTED: MCP protocol validation error with notifications/initialized")
-                                print(f"🔧 REASON: Notification messages should not have 'id' field")
+                                safe_log(f"DETECTED: MCP protocol validation error with notifications/initialized")
+                                safe_log(f"REASON: Notification messages should not have 'id' field")
                                 
                                 try:
                                     from error_logger import log_custom_error
@@ -1192,9 +1306,9 @@ async def main():
                                 except Exception:
                                     pass
                                     
-                                print(f"🔧 BUG IDENTIFIED: The concurrent_mcp_server.py is running as standalone MCP server")
-                                print(f"🔧 SOLUTION: This server should NOT be run directly, it's meant to be called by mcp_wrapper.py")
-                                print(f"🔧 ACTION NEEDED: Fix the script to prevent direct execution or fix MCP protocol compliance")
+                                safe_log(f"BUG IDENTIFIED: The concurrent_mcp_server.py is running as standalone MCP server")
+                                safe_log(f"SOLUTION: This server should NOT be run directly, it's meant to be called by mcp_wrapper.py")
+                                safe_log(f"ACTION NEEDED: Fix the script to prevent direct execution or fix MCP protocol compliance")
                             else:
                                 try:
                                     from error_logger import log_custom_error
@@ -1209,7 +1323,7 @@ async def main():
                             
                 except Exception as e:
                     error_msg = f"stdio_server context error: {e}"
-                    print(f"❌ ERROR: {error_msg}")
+                    safe_log(f"ERROR: {error_msg}")
                     try:
                         from error_logger import log_custom_error
                         log_custom_error("CRITICAL", "STDIO_SERVER_ERROR", "concurrent_mcp_server", 
@@ -1220,7 +1334,7 @@ async def main():
                     
         except Exception as e:
             error_msg = f"HTTP session error: {e}"
-            print(f"❌ ERROR: {error_msg}")
+            safe_log(f"ERROR: {error_msg}")
             try:
                 from error_logger import log_custom_error
                 log_custom_error("CRITICAL", "HTTP_SESSION_ERROR", "concurrent_mcp_server", 
@@ -1230,7 +1344,7 @@ async def main():
             raise
     
     except KeyboardInterrupt:
-        print(f"🛑 INFO: Server shutdown requested (Ctrl+C)")
+        safe_log(f"INFO: Server shutdown requested (Ctrl+C)")
         try:
             from error_logger import log_custom_error
             log_custom_error("INFO", "SHUTDOWN", "concurrent_mcp_server", 
@@ -1241,13 +1355,13 @@ async def main():
     
     except Exception as e:
         error_msg = f"Critical server error: {e}"
-        print(f"❌ CRITICAL ERROR: {error_msg}")
+        safe_log(f"CRITICAL ERROR: {error_msg}")
         
         # Log with full traceback
         try:
             import traceback
             traceback_str = traceback.format_exc()
-            print(f"❌ TRACEBACK:\n{traceback_str}")
+            safe_log(f"TRACEBACK:\n{traceback_str}")
             
             from error_logger import log_custom_error
             log_custom_error("CRITICAL", "MAIN_FUNCTION_ERROR", "concurrent_mcp_server", 
@@ -1256,7 +1370,7 @@ async def main():
                                "error_type": type(e).__name__
                            })
         except Exception as log_error:
-            print(f"⚠️ WARNING: Could not log error: {log_error}")
+            safe_log(f"WARNING: Could not log error: {log_error}")
         
         sys.exit(1)
 
