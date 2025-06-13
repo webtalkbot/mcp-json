@@ -1585,7 +1585,72 @@ async def warmup_server(server_name: str):
     except Exception as e:
         return {"status": "error", "message": f"Warmup check failed: {str(e)}"}
 
-# Individual MCP HTTP Endpoints for each server
+# ===============================
+# 🌊 MCP-PROXY TRANSPORT ENDPOINTS
+# ===============================
+
+@app.get("/servers/{server_name}/sse")
+async def server_sse_transport(server_name: str, request: Request):
+    """SSE transport endpoint for specific server via mcp-proxy"""
+    return await _handle_proxy_transport(server_name, "sse", request)
+
+@app.post("/servers/{server_name}/sse") 
+async def server_sse_transport_post(server_name: str, request: Request):
+    """SSE transport POST endpoint for specific server via mcp-proxy"""
+    return await _handle_proxy_transport(server_name, "sse", request)
+
+@app.get("/servers/{server_name}/streamable")
+async def server_streamable_transport(server_name: str, request: Request):
+    """Streamable HTTP transport endpoint for specific server via mcp-proxy"""
+    return await _handle_proxy_transport(server_name, "streamable", request)
+
+@app.post("/servers/{server_name}/streamable")
+async def server_streamable_transport_post(server_name: str, request: Request):
+    """Streamable HTTP transport POST endpoint for specific server via mcp-proxy"""
+    return await _handle_proxy_transport(server_name, "streamable", request)
+
+async def _handle_proxy_transport(server_name: str, transport: str, request: Request):
+    """Handle proxy transport requests"""
+    try:
+        # Check if server exists and is running
+        server_status = process_manager.get_server_status(server_name)
+        if server_status.get("status") != "running":
+            raise HTTPException(status_code=404, detail=f"Server {server_name} is not running")
+        
+        # Get server config to check transport type
+        server_config = db.get_server(server_name)
+        if not server_config:
+            raise HTTPException(status_code=404, detail=f"Server {server_name} not found")
+        
+        config_data = server_config.get('config_data', {})
+        if isinstance(config_data, dict):
+            server_transport = config_data.get('transport', 'sse')
+        else:
+            server_transport = 'sse'
+        
+        # Check if requested transport matches server configuration
+        if transport != server_transport:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Server {server_name} is configured for {server_transport}, not {transport}"
+            )
+        
+        # Forward to internal mcp-proxy (to be implemented)
+        # For now, return information about the endpoint
+        return {
+            "server_name": server_name,
+            "transport": transport,
+            "status": "available",
+            "proxy_endpoint": f"/servers/{server_name}/{transport}",
+            "message": f"MCP {transport} transport endpoint for {server_name}",
+            "note": "Connect via mcp-proxy client for full MCP protocol support"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error handling proxy transport for {server_name}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 async def _check_server_running(server_name: str):
     """Helper function to check if server is running and properly initialized"""
     if server_name not in process_manager.processes:
@@ -1945,6 +2010,74 @@ async def delete_server_blocked(server_name: str):
 async def update_server_blocked(server_name: str):
     """Server modification is disabled via REST API"""
     raise HTTPException(status_code=404, detail="This endpoint is disabled for security. Use CLI: python3 mcp_manager.py")
+
+# ===============================
+# 🔗 PROXY MANAGEMENT ENDPOINTS  
+# ===============================
+
+@app.get("/proxy/status")
+async def get_proxy_status():
+    """Get status of mcp-proxy instances"""
+    try:
+        # Try to get status from proxy manager if it's running
+        # This would need to be implemented in proxy manager
+        return {
+            "proxy_manager": "not_implemented",
+            "message": "Use mcp_proxy_manager.py to manage proxy instances",
+            "instructions": {
+                "start_proxy_manager": "python mcp_proxy_manager.py",
+                "view_endpoints": "Check console output for proxy endpoints"
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/proxy/endpoints")
+async def list_proxy_endpoints():
+    """List all available proxy endpoints for running servers"""
+    try:
+        servers = db.list_servers()
+        running_servers = [s for s in servers if s['status'] == 'running']
+        
+        endpoints = {}
+        base_port = 9000
+        
+        for i, server in enumerate(running_servers):
+            server_name = server['name']
+            
+            # Get server config
+            config_data = server.get('config_data', {})
+            if isinstance(config_data, dict):
+                transport = config_data.get('transport', 'sse')
+                mode = config_data.get('mode', 'unrestricted')
+            else:
+                transport = 'sse'
+                mode = 'unrestricted'
+            
+            port = base_port + i
+            
+            if transport == 'sse':
+                endpoint = f"http://localhost:{port}/servers/{server_name}/sse"
+            else:
+                endpoint = f"http://localhost:{port}/servers/{server_name}/mcp"
+            
+            endpoints[server_name] = {
+                "transport": transport,
+                "mode": mode,
+                "port": port,
+                "endpoint": endpoint,
+                "status": "estimated"  # Actual status would need proxy manager integration
+            }
+        
+        return {
+            "proxy_endpoints": endpoints,
+            "total_servers": len(running_servers),
+            "base_port": base_port,
+            "note": "Run 'python mcp_proxy_manager.py' to start actual proxy instances"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

@@ -13,12 +13,16 @@ sleep 5
 echo "🔄 Starting auto-restart servers..."
 python auto_restart.py
 
-# 3. Start mcp-proxy for each server
-echo "🔄 Starting mcp-proxy instances..."
+# 3. Start mcp-proxy manager
+echo "🔄 Starting MCP proxy manager..."
 python mcp_proxy_manager.py &
+PROXY_PID=$!
+
+# Wait for proxy manager to initialize
+sleep 10
 
 echo "✅ MCP System ready"
 echo "📡 REST API: http://localhost:$PORT"
-echo "📡 SSE endpoints: http://localhost:9000-9010/sse"
+echo "📡 Proxy endpoints: Check proxy manager output for specific ports"
 
 wait
