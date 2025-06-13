@@ -21,15 +21,20 @@ load_dotenv()
 # Get port from environment
 PORT = int(os.getenv("PORT", 8999))
 
-def add_server(name: str, script_path: str, description: str = "", auto_start: bool = False, transport: str = "sse"):
-    """Add new MCP server with transport type"""
+def add_server(name: str, script_path: str, description: str = "", auto_start: bool = False, transport: str = "sse", mode: str = "unrestricted"):
+    """Add new MCP server with transport type and mode"""
     db = MCPDatabase()
 
-    print(f"ℹ️  Adding MCP server '{name}' with {transport} transport...")
+    print(f"ℹ️  Adding MCP server '{name}' with {transport} transport in {mode} mode...")
 
     # Validácia transport typu
     if transport not in ['sse', 'streamable']:
         print(f"❌ Error: Invalid transport type '{transport}'. Use 'sse' or 'streamable'")
+        return False
+        
+    # Validácia mode
+    if mode not in ['admin', 'public', 'unrestricted']:
+        print(f"❌ Error: Invalid mode '{mode}'. Use 'admin', 'public', or 'unrestricted'")
         return False
 
     # Convert to absolute path and validate
@@ -49,9 +54,10 @@ def add_server(name: str, script_path: str, description: str = "", auto_start: b
         print(f"ℹ️  Storing relative path: {rel_path}")
         script_path = rel_path
 
-    # Store config with transport info
+    # Store config with transport and mode info
     config_data = {
         "transport": transport,
+        "mode": mode,  # NEW: Store mode
         "description": description,
         "created_at": time.time()
     }
@@ -727,6 +733,9 @@ def main():
     add_parser.add_argument('--auto-start', action='store_true', help='Auto-start server on system startup')
     add_parser.add_argument('--transport', choices=['sse', 'streamable'], default='sse', 
                           help='Transport type (default: sse)')
+    # NEW: Pridaj mode parameter
+    add_parser.add_argument('--mode', choices=['admin', 'public', 'unrestricted'], default='unrestricted',
+                          help='Server mode (default: unrestricted)')
 
     # List command
     list_parser = subparsers.add_parser('list', help='List all MCP servers')
@@ -771,7 +780,9 @@ def main():
         logging.basicConfig(level=logging.DEBUG)
 
     if args.command == 'add':
-        add_server(args.name, args.script_path, args.description, args.auto_start, args.transport)
+        # NEW: Pridaj mode parameter do volania
+        mode = getattr(args, 'mode', 'unrestricted')
+        add_server(args.name, args.script_path, args.description, args.auto_start, args.transport, mode)
     elif args.command == 'list':
         list_servers()
     elif args.command == 'start':
