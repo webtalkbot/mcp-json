@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Load environment variables from .env file if it exists
+# Load env. variables from .env file if it exists
 if [ -f .env ]; then
     echo "📝 Loading environment variables from .env file..."
     source .env

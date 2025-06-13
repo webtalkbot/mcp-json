@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-MCP Proxy Config Generator
-Generuje config.json pre TBXark/mcp-proxy na základe serverov v mcp_servers.db bez filtrovania nástrojov
+MCP Proxy Config Generator s automatickým toolFilter
+Generuje config.json pre TBXark/mcp-proxy s automatickým filtrovaním nástrojov podľa endpoints.json
 """
 
 import sqlite3
@@ -9,65 +9,162 @@ import json
 import argparse
 import os
 import sys
+import requests
+import glob
 from pathlib import Path
 from typing import List, Dict, Tuple, Any
 
 
+def load_endpoints_from_json(servers_dir: str = "./servers") -> Dict[str, List[str]]:
+    """
+    Načíta endpointy z *_endpoints.json súborov a vytvorí tool filter zoznamy
+    """
+    server_tools = {}
+    
+    if not os.path.exists(servers_dir):
+        print(f"⚠️  Servers directory not found: {servers_dir}")
+        return {}
+    
+    print(f"🔍 Looking for endpoint files in: {servers_dir}")
+    
+    # Nájdi všetky *_endpoints.json súbory
+    pattern = os.path.join(servers_dir, "**", "*_endpoints.json")
+    endpoint_files = glob.glob(pattern, recursive=True)
+    
+    if not endpoint_files:
+        print(f"⚠️  No *_endpoints.json files found in {servers_dir}")
+        return {}
+    
+    for file_path in endpoint_files:
+        try:
+            # Získaj názov servera z názvu súboru
+            filename = os.path.basename(file_path)
+            server_name = filename.replace('_endpoints.json', '')
+            
+            print(f"📋 Processing {filename} → server: {server_name}")
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                endpoints = json.load(f)
+            
+            # Vytvor zoznam tool names pre tento server
+            tools_list = []
+            for endpoint_name in endpoints.keys():
+                tool_name = f"{server_name}__{endpoint_name}"
+                tools_list.append(tool_name)
+                print(f"   ✅ {tool_name}")
+            
+            server_tools[server_name] = tools_list
+            print(f"📦 {server_name}: {len(tools_list)} tools defined")
+            
+        except Exception as e:
+            print(f"❌ Error processing {file_path}: {e}")
+            continue
+    
+    return server_tools
+
+
+def get_running_servers_from_api(api_url: str = "http://localhost:8999") -> Dict[str, Dict]:
+    """
+    Získa zoznam skutočne bežiacich serverov z API
+    """
+    try:
+        print(f"🔍 Getting running servers from API: {api_url}/servers")
+        response = requests.get(f"{api_url}/servers", timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            
+            running_servers = {}
+            if 'servers' in data and isinstance(data['servers'], list):
+                for server in data['servers']:
+                    if isinstance(server, dict):
+                        name = server.get('name', 'unknown')
+                        status = server.get('status', 'unknown')
+                        if status == 'running':
+                            running_servers[name] = {
+                                'pid': server.get('pid'),
+                                'transport': server.get('transport', 'sse'),
+                                'mode': server.get('mode', 'public'),
+                                'status': status
+                            }
+                            print(f"   ✅ {name}: PID {server.get('pid')}, transport: {server.get('transport', 'sse')}")
+                        else:
+                            print(f"   ⏸️  {name}: {status}")
+                            
+                print(f"✅ Found {len(running_servers)} running servers")
+                return running_servers
+            else:
+                print(f"⚠️  Unexpected API response format")
+        else:
+            print(f"❌ API returned status {response.status_code}")
+            
+    except Exception as e:
+        print(f"❌ Could not get servers from API: {e}")
+        
+    return {}
+
+
 def load_servers_from_db(db_path: str = "./data/mcp_servers.db") -> List[Tuple]:
     """
-    Retrieves servers from SQLite database with new structure
+    Načíta servery z databázy (pre config detaily) ale skombinuje s API stavom
     """
     try:
         if not os.path.exists(db_path):
             print(f"Error: Database file '{db_path}' not found!")
             return []
 
+        # Najprv získaj skutočne bežiace servery z API
+        running_servers = get_running_servers_from_api()
+        if not running_servers:
+            print("⚠️  No running servers found via API")
+            return []
+
+        print(f"\n📋 Found {len(running_servers)} running servers, loading config from DB...")
+
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
-        # Skús zistiť štruktúru tabulky
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = cursor.fetchall()
-        print(f"Found tables: {[table[0] for table in tables]}")
-
-        # Načítaj z tabuľky mcp_servers s novou štruktúrou
-        try:
-            cursor.execute("PRAGMA table_info(mcp_servers)")
-            columns = [col[1] for col in cursor.fetchall()]
-            print(f"Columns in mcp_servers: {columns}")
-
-            # Načítaj len bežiace servery
-            query = """
-                    SELECT name, script_path, description, status, config_data
+        # Skús načítať config detaily z databázy pre bežiace servery
+        converted_servers = []
+        
+        for server_name, server_info in running_servers.items():
+            try:
+                # Pokús sa načítať z databázy
+                cursor.execute("""
+                    SELECT name, script_path, description, config_data
                     FROM mcp_servers
-                    WHERE status = 'running'
-                    """
-            cursor.execute(query)
-            servers = cursor.fetchall()
+                    WHERE name = ?
+                    """, (server_name,))
+                
+                db_row = cursor.fetchone()
+                
+                if db_row:
+                    name, script_path, description, config_data = db_row
+                    
+                    # Parsuj config_data ak existuje
+                    try:
+                        if config_data:
+                            config = json.loads(config_data)
+                            transport = config.get('transport', server_info.get('transport', 'sse'))
+                            mode = config.get('mode', server_info.get('mode', 'public'))
+                        else:
+                            transport = server_info.get('transport', 'sse')
+                            mode = server_info.get('mode', 'public')
+                    except:
+                        transport = server_info.get('transport', 'sse') 
+                        mode = server_info.get('mode', 'public')
+                        
+                    print(f"   📂 {server_name}: loaded from DB (transport: {transport}, mode: {mode})")
+                else:
+                    # Server beží ale nie je v DB - použi default config
+                    transport = server_info.get('transport', 'sse')
+                    mode = server_info.get('mode', 'public')
+                    print(f"   🆕 {server_name}: not in DB, using defaults (transport: {transport}, mode: {mode})")
 
-            # Konvertuj do formátu (name, command, args, env, status)
-            converted_servers = []
-            for server in servers:
-                name, script_path, description, status, config_data = server
-
-                # Parsuj config_data ak existuje
-                try:
-                    if config_data:
-                        config = json.loads(config_data)
-                        transport = config.get('transport', 'sse')
-                        mode = config.get('mode', 'public')
-                    else:
-                        transport = 'sse'
-                        mode = 'public'
-                except:
-                    transport = 'sse'
-                    mode = 'public'
-
-                # Vytvor command, args a env na základe script_path
+                # Vytvor command, args a env
                 command = 'python'
                 args = ['concurrent_mcp_server.py', '--mode', mode]
                 env = {
-                    'MCP_SERVER_NAME': name,
+                    'MCP_SERVER_NAME': server_name,
                     'MCP_TRANSPORT': transport
                 }
 
@@ -75,64 +172,21 @@ def load_servers_from_db(db_path: str = "./data/mcp_servers.db") -> List[Tuple]:
                 args_str = json.dumps(args)
                 env_str = json.dumps(env)
 
-                converted_servers.append((name, command, args_str, env_str, status))
-                print(f"Loaded server: {name} (transport: {transport}, mode: {mode})")
+                converted_servers.append((server_name, command, args_str, env_str, 'running'))
+                
+            except Exception as e:
+                print(f"   ⚠️  Error processing {server_name}: {e}")
+                continue
 
-            conn.close()
-            return converted_servers
-
-        except sqlite3.OperationalError as e:
-            print(f"Error reading mcp_servers table: {e}")
-            conn.close()
-            return []
+        conn.close()
+        return converted_servers
 
     except sqlite3.Error as e:
         print(f"SQLite error: {e}")
         return []
     except Exception as e:
-        print(f"Error loading database: {e}")
+        print(f"Error loading from database: {e}")
         return []
-
-
-def get_server_details_from_api(base_url: str = "http://localhost:8999") -> List[Dict]:
-    """
-    Pokúsi sa získať detaily serverov z API ako fallback
-    """
-    try:
-        import requests
-        response = requests.get(f"{base_url}/servers", timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            print(f"API response type: {type(data)}")
-
-            # API vracia objekt s 'servers' kľúčom
-            if isinstance(data, dict) and 'servers' in data:
-                servers_list = data['servers']
-                print(f"Found {len(servers_list)} servers in API response")
-
-                result = []
-                for server in servers_list:
-                    if isinstance(server, dict):
-                        result.append({
-                            'name': server.get('name', 'unknown'),
-                            'status': server.get('status', 'running'),
-                            'transport': server.get('transport', 'sse')
-                        })
-                    elif isinstance(server, str):
-                        result.append({
-                            'name': server,
-                            'status': 'running',
-                            'transport': 'sse'
-                        })
-
-                return result
-            else:
-                print(f"Unexpected API response format: {data}")
-                return []
-
-    except Exception as e:
-        print(f"Could not fetch from API: {e}")
-    return []
 
 
 def parse_env_string(env_str: str) -> Dict[str, str]:
@@ -174,14 +228,14 @@ def parse_args_string(args_str: str) -> List[str]:
         return args_str.split() if args_str else []
 
 
-def create_config_from_api_fallback(base_url: str, api_url: str = "http://localhost:8999") -> Dict[str, Any]:
-    """Vytvorí config na základe API ako fallback bez filtrovania"""
-    servers_data = get_server_details_from_api(api_url)
+def create_config(base_url: str, servers_data: List[Tuple], output_file: str = "config.json", 
+                 enable_filter: bool = True, servers_dir: str = "./servers") -> Dict[str, Any]:
+    """Vytvorí config.json súbor pre TBXark/mcp-proxy s filtrovaním na základe endpoints.json"""
 
     config = {
         "mcpProxy": {
             "baseURL": base_url,
-            "addr": ":9000",
+            "addr": ":9000", 
             "name": "MCP Proxy",
             "version": "1.0.0",
             "options": {
@@ -192,50 +246,17 @@ def create_config_from_api_fallback(base_url: str, api_url: str = "http://localh
         "mcpServers": {}
     }
 
-    for server in servers_data:
-        name = server.get('name', 'unknown')
-        transport = server.get('transport', 'sse')
+    # Načítaj endpoints z JSON súborov ak je filter povolený
+    server_tools_from_json = {}
+    if enable_filter:
+        print(f"🔧 Tool filtering enabled - loading endpoints from JSON files...")
+        server_tools_from_json = load_endpoints_from_json(servers_dir)
+        
+        if not server_tools_from_json:
+            print("⚠️  No endpoint files found - no filtering will be applied")
+            print(f"💡 Make sure *_endpoints.json files exist in {servers_dir}")
 
-        server_config = {
-            "command": "python",
-            "args": [
-                "concurrent_mcp_server.py",
-                "--mode",
-                "public"
-            ],
-            "env": {
-                "MCP_SERVER_NAME": name,
-                "MCP_TRANSPORT": transport
-            },
-            "options": {
-                "logEnabled": True
-            }
-        }
-
-        config["mcpServers"][name] = server_config
-        print(f"Added server '{name}' from API (transport: {transport}, no filter)")
-
-    return config
-
-
-def create_config(base_url: str, servers_data: List[Tuple], output_file: str = "config.json") -> Dict[str, Any]:
-    """Vytvorí config.json súbor pre TBXark/mcp-proxy bez filtrovania"""
-
-    config = {
-        "mcpProxy": {
-            "baseURL": base_url,
-            "addr": ":9000",
-            "name": "MCP Proxy",
-            "version": "1.0.0",
-            "options": {
-                "logEnabled": True,
-                "authTokens": []
-            }
-        },
-        "mcpServers": {}
-    }
-
-    # Pridaj servery z databázy
+    # Pridaj servery
     for server in servers_data:
         if len(server) >= 4:
             name, command, args_str, env_str = server[:4]
@@ -268,14 +289,26 @@ def create_config(base_url: str, servers_data: List[Tuple], output_file: str = "
             }
         }
 
+        # Pridaj toolFilter na základe endpoints.json ak máme definované nástroje
+        if enable_filter and name in server_tools_from_json:
+            tools = server_tools_from_json[name]
+            server_config["options"]["toolFilter"] = {
+                "mode": "allow",
+                "list": tools
+            }
+            print(f"✅ {name}: {len(tools)} tools from endpoints.json")
+        elif enable_filter:
+            print(f"⚠️  {name}: No endpoints.json found - no filter applied")
+        else:
+            print(f"ℹ️  {name}: Tool filtering disabled")
+
         config["mcpServers"][name] = server_config
-        print(f"Added server '{name}': {command} {' '.join(args_list)} (no filter)")
 
     # Zapíš do súboru
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
-        print(f"\nConfig file created: {output_file}")
+        print(f"\n📝 Config file created: {output_file}")
     except Exception as e:
         print(f"Error writing config file: {e}")
         return {}
@@ -311,7 +344,7 @@ def validate_url(url: str) -> bool:
 
 
 def show_endpoints(config: Dict[str, Any]) -> None:
-    """Zobrazí dostupné endpointy bez informácií o filtrovaní"""
+    """Zobrazí dostupné endpointy s informáciami o filtrovaní"""
     base_url = config.get("mcpProxy", {}).get("baseURL", "")
     servers = config.get("mcpServers", {})
 
@@ -319,14 +352,24 @@ def show_endpoints(config: Dict[str, Any]) -> None:
         print("No servers configured!")
         return
 
-    print(f"\n🚀 Available endpoints:")
+    print(f"\n🚀 Available endpoints with tool filtering:")
     print(f"📡 Base URL: {base_url}")
     print(f"🔧 Local address: http://localhost:9000")
     print()
 
-    for server_name in servers.keys():
+    for server_name, server_config in servers.items():
         endpoint = f"{base_url}/{server_name}/sse"
-        print(f"  ✨ {server_name:15} → {endpoint}")
+        
+        # Zobraz info o filtrovaní
+        filter_info = ""
+        if "toolFilter" in server_config.get("options", {}):
+            tool_filter = server_config["options"]["toolFilter"]
+            tool_count = len(tool_filter.get("list", []))
+            filter_info = f" ({tool_count} filtered tools)"
+        else:
+            filter_info = " (all tools)"
+            
+        print(f"  ✨ {server_name:15} → {endpoint}{filter_info}")
 
     print(f"\n💡 Usage in Claude.ai:")
     for server_name in servers.keys():
@@ -336,13 +379,14 @@ def show_endpoints(config: Dict[str, Any]) -> None:
 def main():
     """Hlavná funkcia"""
     parser = argparse.ArgumentParser(
-        description='Generate TBXark/mcp-proxy config from mcp_servers.db without tool filtering',
+        description='Generate TBXark/mcp-proxy config with tool filtering based on *_endpoints.json files',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   python generate_config.py --url https://abc123.ngrok-free.app
-  python generate_config.py --env-file .env
-  python generate_config.py --env-file .env --use-api-fallback --show-endpoints
+  python generate_config.py --env-file .env --enable-filter
+  python generate_config.py --env-file .env --no-filter --show-endpoints
+  python generate_config.py --env-file .env --servers-dir ./servers
         """
     )
 
@@ -356,9 +400,17 @@ Examples:
     parser.add_argument('--db', default='./data/mcp_servers.db', help='Database path (default: ./data/mcp_servers.db)')
     parser.add_argument('--output', default='config.json', help='Output config file (default: config.json)')
     parser.add_argument('--show-endpoints', action='store_true', help='Show available endpoints after generation')
-    parser.add_argument('--use-api-fallback', action='store_true', help='Use API as fallback if database fails')
+    parser.add_argument('--servers-dir', default='./servers', help='Directory with *_endpoints.json files (default: ./servers)')
+    
+    # Argumenty pre filtrovanie
+    filter_group = parser.add_mutually_exclusive_group()
+    filter_group.add_argument('--enable-filter', action='store_true', default=True, help='Enable tool filtering based on endpoints.json (default)')
+    filter_group.add_argument('--no-filter', action='store_true', help='Disable tool filtering')
 
     args = parser.parse_args()
+
+    # Zistí či má povoliť filtrovanie
+    enable_filter = not args.no_filter
 
     # Získaj URL
     if args.url:
@@ -378,51 +430,27 @@ Examples:
 
     print(f"🔗 Using base URL: {base_url}")
     print(f"📂 Database: {args.db}")
+    print(f"📁 Servers directory: {args.servers_dir}")
+    print(f"🔧 Tool filtering: {'enabled' if enable_filter else 'disabled'}")
 
-    # Načítaj servery z databázy
+    # Načítaj servery (kombinuje API status + DB config)
     servers = load_servers_from_db(args.db)
-
-    # Ak databáza zlyhá a je povolený API fallback
-    if not servers and args.use_api_fallback:
-        print("⚠️  Database failed, trying API fallback...")
-        config = create_config_from_api_fallback(base_url)
-
-        if config.get("mcpServers"):
-            print(f"✅ Found {len(config['mcpServers'])} servers via API")
-
-            # Zapíš config
-            try:
-                with open(args.output, 'w', encoding='utf-8') as f:
-                    json.dump(config, f, indent=2, ensure_ascii=False)
-                print(f"📝 Config file created: {args.output}")
-
-                if args.show_endpoints:
-                    show_endpoints(config)
-
-                print(f"\n🎯 Configuration completed without filtering!")
-                return
-
-            except Exception as e:
-                print(f"Error writing config file: {e}")
-                sys.exit(1)
 
     if not servers:
         print("❌ No running servers found!")
         print("\nTips:")
-        print("- Check if any servers have status 'running'")
-        print("- Try: python mcp_manager.py list")
-        print("- Try --use-api-fallback option")
+        print("- Make sure mcp_wrapper.py is running: python mcp_wrapper.py")
+        print("- Check server status: python mcp_manager.py list")
         sys.exit(1)
 
     print(f"\n✅ Found {len(servers)} running servers:")
     for i, server in enumerate(servers, 1):
         name = server[0]
         command = server[1] if len(server) > 1 else "python"
-        status = server[4] if len(server) > 4 else "running"
-        print(f"  {i}. {name} ({command}) [{status}]")
+        print(f"  {i}. {name} ({command})")
 
     # Vytvor config
-    config = create_config(base_url, servers, args.output)
+    config = create_config(base_url, servers, args.output, enable_filter, args.servers_dir)
 
     if not config:
         print("❌ Failed to create config!")
@@ -432,7 +460,8 @@ Examples:
     if args.show_endpoints:
         show_endpoints(config)
 
-    print(f"\n🎯 Configuration completed without filtering!")
+    filter_status = "with tool filtering from endpoints.json" if enable_filter else "without filtering"
+    print(f"\n🎯 Configuration completed {filter_status}!")
     print(f"📝 Config file: {args.output}")
     print(f"🚀 Start proxy: mcp-proxy --config {args.output}")
 
