@@ -1,4 +1,5 @@
 {
   "transport": "sse",
-  "created_at": 1749762655.8967428
+  "mode": "public",
+  "created_at": 1749810225.334927
 }

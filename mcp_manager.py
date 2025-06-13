@@ -66,7 +66,7 @@ def add_server(name: str, script_path: str, description: str = "", auto_start: b
 
     if success:
         # Create server config file
-        create_server_config(name, transport)
+        create_server_config(name, transport, mode)
         print(f"✅ Server {name} added successfully with {transport} transport")
 
         # Skús informovať API ak je dostupné
@@ -83,7 +83,7 @@ def add_server(name: str, script_path: str, description: str = "", auto_start: b
     return True
 
 
-def create_server_config(server_name: str, transport: str):
+def create_server_config(server_name: str, transport: str, mode: str):
     """Create server configuration file"""
     server_dir = f"servers/{server_name}"
     os.makedirs(server_dir, exist_ok=True)
@@ -91,6 +91,7 @@ def create_server_config(server_name: str, transport: str):
     config_file = f"{server_dir}/{server_name}_config.json"
     config = {
         "transport": transport,
+        "mode": mode,
         "created_at": time.time()
     }
 
@@ -108,8 +109,8 @@ def list_servers(quiet_detection=False):
             servers = data.get('servers', [])
 
             print("📋 MCP Servers (Live Status via API):")
-            print(f"{'Name':<20} {'Status':<10} {'PID':<8} {'Transport':<12} {'Auto Start':<10} {'Description':<30}")
-            print("-" * 100)
+            print(f"{'Name':<20} {'Status':<10} {'PID':<8} {'Transport':<12} {'Mode':<12} {'Auto Start':<10} {'Description':<30}")
+            print("-" * 112)
 
             for server in servers:
                 name = server.get('name', 'Unknown')
@@ -117,13 +118,15 @@ def list_servers(quiet_detection=False):
                 pid = server.get('pid', 'N/A')
                 transport = server.get('transport', 'sse')
 
-                # Get auto_start and description from database
+                # Get auto_start, description and mode from database
                 db = MCPDatabase()
                 server_info = db.get_server(name)
                 auto_start = "Yes" if server_info and server_info.get('auto_start') else "No"
                 description = server_info.get('description', '')[:29] if server_info else ''
+                config_data = server_info.get('config_data', {}) if server_info else {}
+                mode = config_data.get('mode', 'unrestricted')
 
-                print(f"{name:<20} {status:<10} {pid:<8} {transport:<12} {auto_start:<10} {description:<30}")
+                print(f"{name:<20} {status:<10} {pid:<8} {transport:<12} {mode:<12} {auto_start:<10} {description:<30}")
 
             if not servers:
                 print("No servers found")
@@ -140,29 +143,39 @@ def list_servers(quiet_detection=False):
         servers = db.list_servers()
 
         print("📋 MCP Servers (Database + Process Detection):")
-        print(f"{'Name':<20} {'Status':<10} {'PID':<8} {'Transport':<12} {'Auto Start':<10} {'Description':<30}")
-        print("-" * 100)
+        print(f"{'Name':<20} {'Status':<10} {'PID':<8} {'Transport':<12} {'Mode':<12} {'Auto Start':<10} {'Description':<30}")
+        print("-" * 112)
 
         for server in servers:
             name = server.get('name', 'Unknown')
             auto_start = 'Yes' if server.get('auto_start', False) else 'No'
             description = server.get('description', '')[:29]
 
-            # Skús načítať transport z config súboru
+            # Skús načítať transport a mode z config súboru a databázy
             transport = 'sse'  # default
+            mode = 'unrestricted'  # default
+
+            # Najprv skús z databázy
+            config_data = server.get('config_data', {})
+            if isinstance(config_data, dict):
+                mode = config_data.get('mode', 'unrestricted')
+
+            # Potom z config súboru
             try:
                 config_path = f"servers/{name}/{name}_config.json"
                 if os.path.exists(config_path):
                     with open(config_path, 'r') as f:
                         config = json.load(f)
                         transport = config.get('transport', 'sse')
+                        # Config súbor má prioritu pre mode ak existuje
+                        mode = config.get('mode', mode)
             except:
                 pass
 
             # ✅ NOVÁ LOGIKA: Kombinuj databázu + process detection
             status, pid = get_server_actual_status(server, name)
 
-            print(f"{name:<20} {status:<10} {pid:<8} {transport:<12} {auto_start:<10} {description:<30}")
+            print(f"{name:<20} {status:<10} {pid:<8} {transport:<12} {mode:<12} {auto_start:<10} {description:<30}")
 
         if not servers:
             print("No servers found in database")
@@ -655,6 +668,7 @@ def show_server_status(name: str):
             with open(config_path, 'r') as f:
                 config = json.load(f)
                 print(f"      Transport: {config.get('transport', 'sse')}")
+                print(f"      Mode: {config.get('mode', 'unrestricted')}")
                 if 'created_at' in config:
                     import datetime
                     created = datetime.datetime.fromtimestamp(config['created_at'])
