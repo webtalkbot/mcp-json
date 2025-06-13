@@ -15,7 +15,7 @@ from typing import List, Dict, Tuple, Any
 
 def load_servers_from_db(db_path: str = "./data/mcp_servers.db") -> List[Tuple]:
     """
-    Načíta servery z SQLite databázy s novou štruktúrou
+    Retrieves servers from SQLite database with new structure
     """
     try:
         if not os.path.exists(db_path):
