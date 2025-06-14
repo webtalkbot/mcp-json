@@ -105,6 +105,7 @@ python mcp_manager.py list
 ### Step 5: Connect to Claude.ai
 
 To connect a server to Claude.ai via SSE, use this URL format:
+
 https://<your_domain>:<proxy_port>/<server_name>/sse
 
 With your own domain (set in NGROK_URL), combine it with the PROXY_PORT from .env. 
