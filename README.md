@@ -74,7 +74,9 @@ Sample JSON configurations for COINGECKO and OPENSUBTITLES are included, with Op
 
 #### Add a Server using the MCP Manager:
 
+```
 python mcp_manager.py add coingecko concurrent_mcp_server.py --description "Coingecko Server" --transport sse --mode public --auto-start
+```
 
 Command Breakdown:
 
