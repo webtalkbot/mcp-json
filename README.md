@@ -62,11 +62,12 @@ YOUR_API_KEY="your_api_key_for_api_server"
 
 #### Variable Explanations:
 
-NGROK_URL: The URL for your server. Use an ngrok tunnel for testing (e.g., https://your-ngrok-domain.ngrok-free.app) or your custom domain for production.
-SERVERS_DIR: Directory for JSON server configurations (keep as ./servers).
-PORT: Local port for mcp_wrapper to manage servers.
-PROXY_PORT: Port for stdio-to-SSE communication.
-YOUR_API_KEY: API key for securing server access (used in <servername>_security.json).
+- NGROK_URL: The URL for your server. Use an ngrok tunnel for testing (e.g., https://your-ngrok-domain.ngrok-free.app) or your custom domain for production.
+- SERVERS_DIR: Directory for JSON server configurations (keep as ./servers).
+- PORT: Local port for mcp_wrapper to manage servers.
+- PROXY_PORT: Port for stdio-to-SSE communication.
+- YOUR_API_KEY: API key for securing server access (used in <servername>_security.json).
+
 Sample JSON configurations for COINGECKO and OPENSUBTITLES are included, with OpenSubtitles supporting secure API key authentication via headers.
 
 ### Step 3: Add and Configure Servers
