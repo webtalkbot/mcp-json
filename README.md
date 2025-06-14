@@ -82,27 +82,17 @@ Command Breakdown:
 
 add <server_name>: Specifies the server folder and name.
 
-concurrent_mcp_server.py: The server script.
---description: A brief server description.
---transport sse: Communication protocol (SSE recommended; streamable untested).
---mode public: Endpoint access mode (public, unrestricted, or admin).
---auto-start: Automatically starts the server, including after restarts.
+- concurrent_mcp_server.py: The server script.
+- --description: A brief server description.
+- --transport sse: Communication protocol (SSE recommended; streamable untested).
+- --mode public: Endpoint access mode (public, unrestricted, or admin).
+- --auto-start: Automatically starts the server, including after restarts.
 
 ### Verify Server Addition:
 
 ```
 python mcp_manager.py list
 ```
-
-Example Output:
-
-API unavailable, using database with process detection...
-INFO:mcp_database:Database initialized: ./data/mcp_servers.db
-MCP Servers (Database + Process Detection):
-Name           Status   PID   Transport   Mode    Auto Start   Description
-coingecko      stopped  N/A   sse         public  Yes          Coingecko Server
-opensubtitles  stopped  N/A   sse         public  Yes          Opensubtitles Server
-Note: Running mcp_wrapper.py is not required for adding/removing servers.
 
 ### Step 4: Start Servers
 
