@@ -10,8 +10,8 @@ import json
 import requests
 import os
 import time
-import shutil  # Pre odstránenie directories
-import subprocess  # Pridaj ak nie je
+import shutil  # For removing directories
+import subprocess  # Add if not present
 from dotenv import load_dotenv
 from mcp_database import MCPDatabase
 
@@ -27,12 +27,12 @@ def add_server(name: str, script_path: str, description: str = "", auto_start: b
 
     print(f"ℹ️  Adding MCP server '{name}' with {transport} transport in {mode} mode...")
 
-    # Validácia transport typu
+    # Validate transport type
     if transport not in ['sse', 'streamable']:
         print(f"❌ Error: Invalid transport type '{transport}'. Use 'sse' or 'streamable'")
         return False
         
-    # Validácia mode
+    # Validate mode
     if mode not in ['admin', 'public', 'unrestricted']:
         print(f"❌ Error: Invalid mode '{mode}'. Use 'admin', 'public', or 'unrestricted'")
         return False
@@ -69,7 +69,7 @@ def add_server(name: str, script_path: str, description: str = "", auto_start: b
         create_server_config(name, transport, mode)
         print(f"✅ Server {name} added successfully with {transport} transport")
 
-        # Skús informovať API ak je dostupné
+        # Try to inform API if available
         try:
             requests.post(f"http://localhost:{PORT}/reload", timeout=2)
             print(f"ℹ️  Notified API wrapper about new server")
@@ -138,7 +138,7 @@ def list_servers(quiet_detection=False):
         if not quiet_detection:
             print("⚠️  API unavailable, using database with process detection...")
 
-        # Fallback na databázu + process detection
+        # Fallback to database + process detection
         db = MCPDatabase()
         servers = db.list_servers()
 
@@ -151,28 +151,28 @@ def list_servers(quiet_detection=False):
             auto_start = 'Yes' if server.get('auto_start', False) else 'No'
             description = server.get('description', '')[:29]
 
-            # Skús načítať transport a mode z config súboru a databázy
+            # Try to load transport and mode from config file and database
             transport = 'sse'  # default
             mode = 'unrestricted'  # default
 
-            # Najprv skús z databázy
+            # First try from database
             config_data = server.get('config_data', {})
             if isinstance(config_data, dict):
                 mode = config_data.get('mode', 'unrestricted')
 
-            # Potom z config súboru
+            # Then from config file
             try:
                 config_path = f"servers/{name}/{name}_config.json"
                 if os.path.exists(config_path):
                     with open(config_path, 'r') as f:
                         config = json.load(f)
                         transport = config.get('transport', 'sse')
-                        # Config súbor má prioritu pre mode ak existuje
+                        # Config file has priority for mode if it exists
                         mode = config.get('mode', mode)
             except:
                 pass
 
-            # ✅ NOVÁ LOGIKA: Kombinuj databázu + process detection
+            # ✅ NEW LOGIC: Combine database + process detection
             status, pid = get_server_actual_status(server, name)
 
             print(f"{name:<20} {status:<10} {pid:<8} {transport:<12} {mode:<12} {auto_start:<10} {description:<30}")
@@ -185,18 +185,18 @@ def get_server_actual_status(server_data, server_name):
     db_status = server_data.get('status', 'stopped')
     db_pid = server_data.get('pid')
 
-    # Ak je v databáze stopped, skontroluj procesy
+    # If in database stopped, check processes
     if db_status == 'stopped':
         process_status, process_pid = detect_standalone_server(server_name)
         return process_status, process_pid
 
-    # Ak je v databáze running, overiť či process skutočne beží
+    # If in database running, verify if process is actually running
     if db_status == 'running' and db_pid:
-        # Skontroluj či PID stále existuje
+        # Check if PID still exists
         if is_pid_running(db_pid, server_name):
             return 'running', str(db_pid)
         else:
-            # Process je mŕtvy, aktualizuj databázu
+            # Process is dead, update database
             db = MCPDatabase()
             db.update_server_status(server_name, 'stopped')
             return 'stopped (crashed)', 'N/A'
@@ -214,7 +214,7 @@ def is_pid_running(pid, expected_server_name):
             cmdline = proc.cmdline()
             environ = proc.environ()
 
-            # Skontroluj či je to náš MCP server
+            # Check if it's our MCP server
             if ('python' in str(cmdline).lower() and 
                 'concurrent_mcp_server.py' in ' '.join(cmdline) and
                 environ.get('MCP_SERVER_NAME') == expected_server_name):
@@ -224,7 +224,7 @@ def is_pid_running(pid, expected_server_name):
             return False
 
     except ImportError:
-        # Bez psutil nemôžeme overiť
+        # Without psutil we cannot verify
         return False
 
     return False
@@ -239,7 +239,7 @@ def detect_standalone_server(server_name):
                 cmdline = proc.info['cmdline']
                 environ = proc.info['environ'] or {}
 
-                # Skontroluj či proces patrí k nášmu serveru
+                # Check if the process belongs to our server
                 if (cmdline and 'python' in str(cmdline).lower() and 
                     'concurrent_mcp_server.py' in ' '.join(cmdline) and
                     environ.get('MCP_SERVER_NAME') == server_name):
@@ -268,13 +268,13 @@ def get_server_processes(server_name=None):
                 cmdline = proc.info['cmdline']
                 environ = proc.info['environ'] or {}
 
-                # Skontroluj či proces patrí k MCP serveru
+                # Check if the process belongs to an MCP server
                 if (cmdline and 'python' in cmdline[0].lower() and 
                     'concurrent_mcp_server.py' in ' '.join(cmdline)):
 
                     process_server_name = environ.get('MCP_SERVER_NAME', 'unknown')
 
-                    # Ak hľadáme konkrétny server
+                    # If we are looking for a specific server
                     if server_name and process_server_name != server_name:
                         continue
 
@@ -300,7 +300,7 @@ def start_server(name: str):
     """Start MCP server (with database fallback and standalone mode)"""
     print(f"ℹ️  Starting MCP server '{name}'...")
 
-    # Najprv skús cez API
+    # First try via API
     try:
         response = requests.post(f"http://localhost:{PORT}/servers/{name}/start", timeout=5)
         if response.status_code == 200:
@@ -312,7 +312,7 @@ def start_server(name: str):
     except requests.exceptions.RequestException:
         print(f"⚠️  API unavailable, starting server in standalone mode...")
 
-        # Fallback - spusti server priamo
+        # Fallback - start server directly
         return start_server_standalone(name)
 
 def start_server_standalone(name: str):
@@ -320,7 +320,7 @@ def start_server_standalone(name: str):
     db = MCPDatabase()
     servers = db.list_servers()
 
-    # Nájdi server v databáze
+    # Find server in database
     server_data = None
     for server in servers:
         if server['name'] == name:
@@ -333,13 +333,13 @@ def start_server_standalone(name: str):
 
     script_path = server_data['script_path']
 
-    # Skontroluj či súbor existuje
+    # Check if file exists
     if not os.path.exists(script_path):
         print(f"❌ Script file not found: {script_path}")
         return False
 
     try:
-        # Načítaj transport z config súboru
+        # Load transport from config file
         transport = 'sse'  # default
         try:
             config_path = f"servers/{name}/{name}_config.json"
@@ -350,7 +350,7 @@ def start_server_standalone(name: str):
         except:
             pass
 
-        # ✅ KĽÚČOVÉ: Nastavenie environment variables
+        # ✅ KEY: Setting environment variables
         env = os.environ.copy()
         env['MCP_SERVER_NAME'] = name
         env['MCP_TRANSPORT'] = transport
@@ -371,16 +371,16 @@ def start_server_standalone(name: str):
             cwd=os.getcwd()
         )
 
-        # Krátke čakanie aby sa server spustil
+        # Short wait for the server to start
         time.sleep(2)
 
-        # Skontroluj či process ešte beží
+        # Check if process is still running
         if process.poll() is None:
             print(f"✅ Server {name} started in standalone mode (PID: {process.pid})")
             print(f"ℹ️  Transport: {transport}")
             print(f"⚠️  Note: Server is running independently, not managed by wrapper")
 
-            # Aktualizuj databázu s PID (ak je to možné)
+            # Update database with PID (if possible)
             try:
                 db.update_server_status(name, 'running', process.pid)
                 print(f"ℹ️  Database updated with PID {process.pid}")
@@ -409,7 +409,7 @@ def stop_server(name: str):
     """Stop MCP server (with API and process fallback)"""
     print(f"ℹ️  Stopping MCP server '{name}'...")
 
-    # Najprv skús cez API
+    # First try via API
     try:
         response = requests.post(f"http://localhost:{PORT}/servers/{name}/stop", timeout=5)
         if response.status_code == 200:
@@ -420,7 +420,7 @@ def stop_server(name: str):
     except requests.exceptions.RequestException:
         print(f"⚠️  API unavailable, trying to stop server processes...")
 
-    # Fallback - pokús sa nájsť a zastaviť procesy
+    # Fallback - try to find and stop processes
     return stop_server_processes(name)
 
 def stop_server_processes(name: str):
@@ -430,13 +430,13 @@ def stop_server_processes(name: str):
     stopped_count = 0
 
     try:
-        # Nájdi procesy ktoré obsahujú názov servera
+        # Find processes that contain the server name
         for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'environ']):
             try:
                 cmdline = proc.info['cmdline']
                 environ = proc.info['environ'] or {}
 
-                # Skontroluj či proces patrí k nášmu serveru
+                # Check if the process belongs to our server
                 if (cmdline and 'python' in cmdline[0].lower() and 
                     'concurrent_mcp_server.py' in ' '.join(cmdline) and
                     environ.get('MCP_SERVER_NAME') == name):
@@ -444,7 +444,7 @@ def stop_server_processes(name: str):
                     print(f"ℹ️  Found server process: PID {proc.info['pid']}")
                     proc.terminate()
 
-                    # Čakaj na ukončenie
+                    # Wait for termination
                     try:
                         proc.wait(timeout=5)
                         stopped_count += 1
@@ -479,7 +479,7 @@ def remove_server(name: str):
 
     db = MCPDatabase()
 
-    # Najprv skús cez API (ak je dostupné)
+    # First try via API (if available)
     try:
         response = requests.delete(f"http://localhost:{PORT}/servers/{name}", timeout=5)
         if response.status_code == 200:
@@ -492,9 +492,9 @@ def remove_server(name: str):
     except requests.exceptions.RequestException as e:
         print(f"⚠️  API unavailable ({type(e).__name__}), removing from database...")
 
-    # Fallback na databázu
+    # Fallback to database
     try:
-        # Skontroluj či server existuje v databáze
+        # Check if server exists in database
         servers = db.list_servers()
         server_exists = any(server['name'] == name for server in servers)
 
@@ -502,7 +502,7 @@ def remove_server(name: str):
             print(f"❌ Server '{name}' not found in database")
             return False
 
-        # Odstráň z databázy
+        # Remove from database
         if db.remove_server(name):
             print(f"✅ Server {name} removed from database")
 
@@ -561,7 +561,7 @@ def start_server_debug(name: str):
     db = MCPDatabase()
     servers = db.list_servers()
 
-    # Nájdi server v databáze
+    # Find server in database
     server_data = None
     for server in servers:
         if server['name'] == name:
@@ -579,7 +579,7 @@ def start_server_debug(name: str):
         return False
 
     try:
-        # Načítaj transport
+        # Load transport
         transport = 'sse'
         try:
             config_path = f"servers/{name}/{name}_config.json"
@@ -600,18 +600,18 @@ def start_server_debug(name: str):
         print(f"   Script: {script_path}")
         print(f"   Environment: MCP_SERVER_NAME={name}, MCP_TRANSPORT={transport}")
 
-        # Spusti server BEZ redirect stdout/stderr
+        # Start server WITHOUT redirecting stdout/stderr
         process = subprocess.Popen(
             [sys.executable, script_path],
             env=env,
             cwd=os.getcwd()
-            # ✅ NEVYUŽÍVAME stdout=PIPE, stderr=PIPE aby sme videli output
+            # ✅ WE ARE NOT USING stdout=PIPE, stderr=PIPE to see output
         )
 
         print(f"🚀 Process started with PID: {process.pid}")
         print(f"⏳ Waiting 5 seconds to see if it crashes...")
 
-        # Čakaj 5 sekúnd
+        # Wait 5 seconds
         time.sleep(5)
 
         if process.poll() is None:
@@ -619,7 +619,7 @@ def start_server_debug(name: str):
             print(f"💡 Press Ctrl+C to stop the debug session")
 
             try:
-                # Čakaj na input od usera
+                # Wait for user input
                 input("Press Enter to terminate the server...")
             except KeyboardInterrupt:
                 pass
@@ -641,7 +641,7 @@ def show_server_status(name: str):
     """Show detailed status of specific server"""
     print(f"📊 Status for server '{name}':")
 
-    # Skontroluj databázu
+    # Check database
     db = MCPDatabase()
     servers = db.list_servers()
     server_data = None
@@ -661,7 +661,7 @@ def show_server_status(name: str):
     print(f"      Description: {server_data.get('description', 'N/A')}")
     print(f"      Auto Start: {'Yes' if server_data.get('auto_start', False) else 'No'}")
 
-    # Skontroluj config
+    # Check config
     try:
         config_path = f"servers/{name}/{name}_config.json"
         if os.path.exists(config_path):
@@ -676,7 +676,7 @@ def show_server_status(name: str):
     except:
         print(f"      Config: Not available")
 
-    # Skontroluj API status
+    # Check API status
     try:
         response = requests.get(f"http://localhost:{PORT}/servers/{name}", timeout=3)
         if response.status_code == 200:
@@ -689,7 +689,7 @@ def show_server_status(name: str):
     except:
         print(f"   🌐 API Status: Offline")
 
-    # Skontroluj standalone procesy
+    # Check standalone processes
     processes = get_server_processes(name)
     if processes:
         print(f"   🔄 Standalone Processes:")
@@ -739,7 +739,7 @@ def main():
     parser = argparse.ArgumentParser(description='MCP Server Manager CLI')
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
 
-    # Add command - ROZŠÍRENÝ
+    # Add command - EXTENDED
     add_parser = subparsers.add_parser('add', help='Add a new MCP server')
     add_parser.add_argument('name', help='Server name')
     add_parser.add_argument('script_path', help='Path to the MCP server script')
@@ -747,7 +747,7 @@ def main():
     add_parser.add_argument('--auto-start', action='store_true', help='Auto-start server on system startup')
     add_parser.add_argument('--transport', choices=['sse', 'streamable'], default='sse', 
                           help='Transport type (default: sse)')
-    # NEW: Pridaj mode parameter
+    # NEW: Add mode parameter
     add_parser.add_argument('--mode', choices=['admin', 'public', 'unrestricted'], default='unrestricted',
                           help='Server mode (default: unrestricted)')
 
@@ -772,29 +772,29 @@ def main():
     request_parser.add_argument('method', help='JSON-RPC method (e.g., tools/call, tools/list)')
     request_parser.add_argument('--params', help='JSON parameters', default='{}')
 
-    # Status command - NOVÝ
+    # Status command - NEW
     status_parser = subparsers.add_parser('status', help='Show detailed status of a server')
     status_parser.add_argument('name', help='Server name')
 
-    # Processes command - NOVÝ  
+    # Processes command - NEW  
     processes_parser = subparsers.add_parser('processes', help='Show all running MCP server processes')
 
-    # Debug command - NOVÝ
+    # Debug command - NEW
     debug_parser = subparsers.add_parser('debug-processes', help='Debug all MCP server processes')
 
-    # Start-debug command - NOVÝ
+    # Start-debug command - NEW
     start_debug_parser = subparsers.add_parser('start-debug', help='Start server with debug output')
     start_debug_parser.add_argument('name', help='Server name')
 
     args = parser.parse_args()
 
-    # Debug mode pre troubleshooting
+    # Debug mode for troubleshooting
     if hasattr(args, 'debug') and args.debug:
         import logging
         logging.basicConfig(level=logging.DEBUG)
 
     if args.command == 'add':
-        # NEW: Pridaj mode parameter do volania
+        # NEW: Add mode parameter to call
         mode = getattr(args, 'mode', 'unrestricted')
         add_server(args.name, args.script_path, args.description, args.auto_start, args.transport, mode)
     elif args.command == 'list':
@@ -819,7 +819,7 @@ def main():
                 print(f"{proc['pid']:<8} {proc['server_name']:<20} {proc['transport']:<12} {started:<20}")
         else:
             print("No running MCP server processes found")
-    elif args.command == 'debug-processes':  # NOVÝ debug príkaz
+    elif args.command == 'debug-processes':  # NEW debug command
         debug_all_processes()
     elif args.command == 'start-debug':
         start_server_debug(args.name)

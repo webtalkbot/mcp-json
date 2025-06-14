@@ -203,7 +203,7 @@ def http_retry(max_retries: int = 3, base_delay: float = 1.0, backoff_factor: fl
                         isinstance(e, aiohttp.ClientConnectorError),
                         isinstance(e, aiohttp.ServerTimeoutError),
                         isinstance(e, aiohttp.ServerDisconnectedError),
-                        # FIXED: Bezpečnejšia kontrola HTTP status codes 5xx (server errors)
+                        # FIXED: Safer check for HTTP status codes 5xx (server errors)
                         (hasattr(e, 'status') and isinstance(getattr(e, 'status', None), int) and e.status >= 500),
                         # For network-level errors
                         "Connection" in str(e),
@@ -214,7 +214,7 @@ def http_retry(max_retries: int = 3, base_delay: float = 1.0, backoff_factor: fl
                     if attempt < max_retries and any(retry_conditions):
                         # Exponential backoff with jitter
                         delay = base_delay * (backoff_factor ** attempt) + random.uniform(0, 0.5)
-                        safe_log(f"HTTP retry attempt {attempt + 1}/{max_retries + 1} po {delay:.1f}s: {type(e).__name__}: {e}")
+                        safe_log(f"HTTP retry attempt {attempt + 1}/{max_retries + 1} after {delay:.1f}s: {type(e).__name__}: {e}")
                         await asyncio.sleep(delay)
                         continue
                     
@@ -446,19 +446,19 @@ class ConcurrentRESTClient:
         """FIXED: Prepares URL with path parameters and query parameters"""
         import re
         
-        # FIXED: Identifikuj ktoré user_params sú určené pre path substitution
+        # FIXED: Identify which user_params are intended for path substitution
         path_placeholders = set()
         for match in re.finditer(r'\{(\w+)\}', url):
             path_placeholders.add(match.group(1))
         
-        # FIXED: Rozdeľ user_params na path a query
+        # FIXED: Split user_params into path and query
         path_user_params = {k: v for k, v in user_params.items() if k in path_placeholders}
         query_user_params = {k: v for k, v in user_params.items() if k not in path_placeholders}
         
         # Merge path params
         all_path_params = {}
         all_path_params.update(path_params)  # Default values from config
-        all_path_params.update(path_user_params)  # FIXED: Len relevantné path params
+        all_path_params.update(path_user_params)  # FIXED: Only relevant path params
         
         # Replace {placeholders} in URL
         final_url = self._substitute_placeholders(url, all_path_params)
@@ -590,7 +590,7 @@ class ConcurrentRESTClient:
                 
                 if self._debug_calls.get(server_name, 0) < 3:
                     self._debug_calls[server_name] = self._debug_calls.get(server_name, 0) + 1
-                    safe_log(f"Debug call #{self._debug_calls[server_name]} pre {server_name}:")
+                    safe_log(f"Debug call #{self._debug_calls[server_name]} for {server_name}:")
                     safe_log(f"   Method: {method}")
                     safe_log(f"   URL: {final_url}")
                     safe_log(f"   Headers: {dict(headers)}")
@@ -644,7 +644,7 @@ class ConcurrentRESTClient:
             except asyncio.TimeoutError:
                 response_time = asyncio.get_event_loop().time() - start_time
                 return {
-                    "error": f"Request timeout po {timeout}s",
+                    "error": f"Request timeout after {timeout}s",
                     "response_time": response_time,
                     "url": final_url if 'final_url' in locals() else url,
                     "method": method if 'method' in locals() else "UNKNOWN"
@@ -1063,7 +1063,7 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
             
             return [types.TextContent(type="text", text=mode_info)]
         
-        # Existing tool handling - kompletne
+        # Existing tool handling - complete
         if name == "list_servers":
             servers = await config_manager.discover_servers()
             
@@ -1193,7 +1193,7 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
             
             return [types.TextContent(type="text", text=output)]
 
-        # Admin-only tools (ak mode povoľuje)
+        # Admin-only tools (if mode allows)
         elif name == "test_authentication":
             server_name = arguments["server_name"]
             # Mock implementation since we don't have security manager
@@ -1394,9 +1394,9 @@ async def main():
                                 except Exception:
                                     pass
                                     
-                                safe_log(f"BUG IDENTIFIED: The concurrent_mcp_server.py is running as standalone MCP server")
-                                safe_log(f"SOLUTION: This server should NOT be run directly, it's meant to be called by mcp_wrapper.py")
-                                safe_log(f"ACTION NEEDED: Fix the script to prevent direct execution or fix MCP protocol compliance")
+                                safe_log(f"BUG IDENTIFIED: The concurrent_mcp_server.py is running as a standalone MCP server")
+                                safe_log(f"SOLUTION: This server should NOT be run directly; it's meant to be called by mcp_wrapper.py")
+                                safe_log(f"ACTION NEEDED: Fix the script to prevent direct execution or ensure MCP protocol compliance")
                             else:
                                 try:
                                     from error_logger import log_custom_error

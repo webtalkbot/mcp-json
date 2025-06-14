@@ -70,11 +70,11 @@ class SecurityManager:
         server_dir = self.config_dir / "servers" / server_name
         security_file = server_dir / f"{server_name}_security.json"
         
-        print(f"🔒 DEBUG: Loading security config for {server_name} from {security_file}")
+        print(f"🔒 DEBUG: Loading security configuration for {server_name} from {security_file}")
         
         if not security_file.exists():
             # Fallback to "none" provider
-            print(f"⚠️ WARNING: No security file for {server_name}, using 'none' provider")
+            print(f"⚠️ WARNING: No security file found for {server_name}, using 'none' provider")
             provider = create_security_provider('none', {})
             async with self._lock:
                 self._providers[server_name] = provider
@@ -87,7 +87,7 @@ class SecurityManager:
             provider_type = config.get('provider_type', 'none')
             provider_config = config.get('config', {})
             
-            print(f"🔒 DEBUG: {server_name} uses {provider_type} provider with config: {provider_config}")
+            print(f"🔒 DEBUG: {server_name} is using {provider_type} provider with config: {provider_config}")
             
             # Create provider
             provider = create_security_provider(provider_type, provider_config)
@@ -96,7 +96,7 @@ class SecurityManager:
                 self._providers[server_name] = provider
                 
         except Exception as e:
-            print(f"❌ ERROR: Error parsing security config for {server_name}: {e}")
+            print(f"❌ ERROR: Error parsing security configuration for {server_name}: {e}")
             # Fallback to "none" provider
             provider = create_security_provider('none', {})
             async with self._lock:
@@ -183,7 +183,7 @@ class SecurityManager:
                     return False
                     
         except Exception as e:
-            logger.error(f"❌ ERROR: Authentication test failed for {server_name}: {e}")
+            print(f"❌ ERROR: Authentication test failed for {server_name}: {e}")
             return False
 
     async def refresh_authentication(self, server_name: str) -> bool:

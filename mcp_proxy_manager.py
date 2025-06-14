@@ -293,12 +293,12 @@ class MCPSingleProxyManager:
         app.router.add_get('/endpoints', self.list_endpoints)
         app.router.add_get('/', self.list_endpoints)
         
-        # ✅ ZACHOVANÉ PÔVODNÉ ENDPOINT FORMÁTY
-        # sparfenyuk mcp-proxy kompatibilné endpointy: /servers/{name}/sse
+        # ✅ ORIGINAL ENDPOINT FORMATS PRESERVED
+        # sparfenyuk mcp-proxy compatible endpoints: /servers/{name}/sse
         app.router.add_route('*', '/servers/{server_name}/sse', self.proxy_request_sparfenyuk)
         app.router.add_route('*', '/servers/{server_name}/sse/{tail:.*}', self.proxy_request_sparfenyuk)
         
-        # Voliteľne aj kratší formát pre spätnu kompatibilitu
+        # Optionally, a shorter format for backward compatibility
         app.router.add_route('*', '/{server_name}/sse', self.proxy_request_short)
         app.router.add_route('*', '/{server_name}/sse/{tail:.*}', self.proxy_request_short)
         
@@ -421,7 +421,7 @@ class MCPSingleProxyManager:
 
         for server in servers:
             server_name = server['name']
-            # ✅ ZACHOVANÝ PÔVODNÝ FORMÁT
+            # ✅ ORIGINAL FORMAT PRESERVED
             endpoint = f"http://localhost:{self.proxy_port}/servers/{server_name}/sse"
             server_config = self.get_server_config(server_name)
             mode = server_config.get('mode', 'unrestricted')
@@ -451,7 +451,7 @@ class MCPSingleProxyManager:
         print("-" * 82)
 
         for server_name in config["mcpServers"].keys():
-            # ✅ ZACHOVANÝ PÔVODNÝ FORMÁT
+            # ✅ ORIGINAL FORMAT PRESERVED
             endpoint = f"http://localhost:{self.proxy_port}/servers/{server_name}/sse"
             server_config = self.get_server_config(server_name)
             mode = server_config.get('mode', 'unrestricted')
@@ -461,7 +461,7 @@ class MCPSingleProxyManager:
         print(f"\n💡 Usage examples:")
         print(f"   Claude Desktop: Add http://localhost:{self.proxy_port}/servers/{{server_name}}/sse")
         print(f"   Test endpoint: curl http://localhost:{self.proxy_port}/servers/opensubtitles/sse")
-        print(f"   All servers available on single port with path routing!")
+        print(f"   All servers available on a single port with path routing!")
 
     async def shutdown(self):
         """Graceful shutdown"""

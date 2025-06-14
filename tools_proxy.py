@@ -33,20 +33,20 @@ class ToolsProxy:
     
     async def get_all_tools(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
         """
-        🔧 FIXED: Aggregate tools from all running servers with optimized cache handling
+        Aggregate tools from all running servers with optimized cache handling
         Returns MCP-compliant tools list with server prefixes for conflict resolution
         """
         import time
         current_time = time.time()
         
-        # 🔧 FIXED: Check cache outside lock first to minimize lock contention
+        # Check cache outside lock first to minimize lock contention
         if not force_refresh:
             async with self.lock:
                 if (current_time - self.last_cache_update) < self.cache_timeout:
                     logger.debug("Tools: Using cached tools list")
                     return self._get_cached_tools_list()  # Return copy
         
-        # 🔧 FIXED: Refresh logic with double-check pattern
+        # Refresh logic with double-check pattern
         async with self.lock:
             # Double-check inside lock to prevent race conditions
             if not force_refresh and (current_time - self.last_cache_update) < self.cache_timeout:

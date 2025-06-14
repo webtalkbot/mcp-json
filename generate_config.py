@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-MCP Proxy Config Generator s automatickým toolFilter
-Generuje config.json pre TBXark/mcp-proxy s automatickým filtrovaním nástrojov podľa endpoints.json
+MCP Proxy Config Generator with automatic toolFilter
+Generates config.json for TBXark/mcp-proxy with automatic tool filtering based on endpoints.json
 """
 
 import sqlite3
@@ -17,7 +17,7 @@ from typing import List, Dict, Tuple, Any
 
 def load_endpoints_from_json(servers_dir: str = "./servers") -> Dict[str, List[str]]:
     """
-    Načíta endpointy z *_endpoints.json súborov a vytvorí tool filter zoznamy
+    Loads endpoints from *_endpoints.json files and creates tool filter lists
     """
     server_tools = {}
     
@@ -27,7 +27,7 @@ def load_endpoints_from_json(servers_dir: str = "./servers") -> Dict[str, List[s
     
     print(f"🔍 Looking for endpoint files in: {servers_dir}")
     
-    # Nájdi všetky *_endpoints.json súbory
+    # Find all *_endpoints.json files
     pattern = os.path.join(servers_dir, "**", "*_endpoints.json")
     endpoint_files = glob.glob(pattern, recursive=True)
     
@@ -37,7 +37,7 @@ def load_endpoints_from_json(servers_dir: str = "./servers") -> Dict[str, List[s
     
     for file_path in endpoint_files:
         try:
-            # Získaj názov servera z názvu súboru
+            # Get server name from filename
             filename = os.path.basename(file_path)
             server_name = filename.replace('_endpoints.json', '')
             
@@ -46,7 +46,7 @@ def load_endpoints_from_json(servers_dir: str = "./servers") -> Dict[str, List[s
             with open(file_path, 'r', encoding='utf-8') as f:
                 endpoints = json.load(f)
             
-            # Vytvor zoznam tool names pre tento server
+            # Create a list of tool names for this server
             tools_list = []
             for endpoint_name in endpoints.keys():
                 tool_name = f"{server_name}__{endpoint_name}"
@@ -65,7 +65,7 @@ def load_endpoints_from_json(servers_dir: str = "./servers") -> Dict[str, List[s
 
 def get_running_servers_from_api(api_url: str = "http://localhost:8999") -> Dict[str, Dict]:
     """
-    Získa zoznam skutočne bežiacich serverov z API
+    Gets a list of truly running servers from the API
     """
     try:
         print(f"🔍 Getting running servers from API: {api_url}/servers")
@@ -105,14 +105,14 @@ def get_running_servers_from_api(api_url: str = "http://localhost:8999") -> Dict
 
 def load_servers_from_db(db_path: str = "./data/mcp_servers.db") -> List[Tuple]:
     """
-    Načíta servery z databázy (pre config detaily) ale skombinuje s API stavom
+    Loads servers from the database (for config details) and combines with API status
     """
     try:
         if not os.path.exists(db_path):
             print(f"Error: Database file '{db_path}' not found!")
             return []
 
-        # Najprv získaj skutočne bežiace servery z API
+        # First, get truly running servers from the API
         running_servers = get_running_servers_from_api()
         if not running_servers:
             print("⚠️  No running servers found via API")
@@ -123,12 +123,12 @@ def load_servers_from_db(db_path: str = "./data/mcp_servers.db") -> List[Tuple]:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
-        # Skús načítať config detaily z databázy pre bežiace servery
+        # Try to load config details from the database for running servers
         converted_servers = []
         
         for server_name, server_info in running_servers.items():
             try:
-                # Pokús sa načítať z databázy
+                # Try to load from the database
                 cursor.execute("""
                     SELECT name, script_path, description, config_data
                     FROM mcp_servers
@@ -140,7 +140,7 @@ def load_servers_from_db(db_path: str = "./data/mcp_servers.db") -> List[Tuple]:
                 if db_row:
                     name, script_path, description, config_data = db_row
                     
-                    # Parsuj config_data ak existuje
+                    # Parse config_data if it exists
                     try:
                         if config_data:
                             config = json.loads(config_data)
@@ -155,12 +155,12 @@ def load_servers_from_db(db_path: str = "./data/mcp_servers.db") -> List[Tuple]:
                         
                     print(f"   📂 {server_name}: loaded from DB (transport: {transport}, mode: {mode})")
                 else:
-                    # Server beží ale nie je v DB - použi default config
+                    # Server is running but not in DB - use default config
                     transport = server_info.get('transport', 'sse')
                     mode = server_info.get('mode', 'public')
                     print(f"   🆕 {server_name}: not in DB, using defaults (transport: {transport}, mode: {mode})")
 
-                # Vytvor command, args a env
+                # Create command, args and env
                 command = 'python'
                 args = ['concurrent_mcp_server.py', '--mode', mode]
                 env = {
@@ -168,7 +168,7 @@ def load_servers_from_db(db_path: str = "./data/mcp_servers.db") -> List[Tuple]:
                     'MCP_TRANSPORT': transport
                 }
 
-                # Konvertuj args a env na stringy pre kompatibilitu
+                # Convert args and env to strings for compatibility
                 args_str = json.dumps(args)
                 env_str = json.dumps(env)
 
@@ -190,7 +190,7 @@ def load_servers_from_db(db_path: str = "./data/mcp_servers.db") -> List[Tuple]:
 
 
 def parse_env_string(env_str: str) -> Dict[str, str]:
-    """Parsuje environment string do dictionary"""
+    """Parses environment string into a dictionary"""
     if not env_str:
         return {}
 
@@ -212,7 +212,7 @@ def parse_env_string(env_str: str) -> Dict[str, str]:
 
 
 def parse_args_string(args_str: str) -> List[str]:
-    """Parsuje arguments string do listu"""
+    """Parses arguments string into a list"""
     if not args_str:
         return []
 
@@ -230,7 +230,7 @@ def parse_args_string(args_str: str) -> List[str]:
 
 def create_config(base_url: str, servers_data: List[Tuple], output_file: str = "config.json", 
                  enable_filter: bool = True, servers_dir: str = "./servers") -> Dict[str, Any]:
-    """Vytvorí config.json súbor pre TBXark/mcp-proxy s filtrovaním na základe endpoints.json"""
+    """Creates a config.json file for TBXark/mcp-proxy with filtering based on endpoints.json"""
 
     config = {
         "mcpProxy": {
@@ -246,7 +246,7 @@ def create_config(base_url: str, servers_data: List[Tuple], output_file: str = "
         "mcpServers": {}
     }
 
-    # Načítaj endpoints z JSON súborov ak je filter povolený
+    # Load endpoints from JSON files if filtering is enabled
     server_tools_from_json = {}
     if enable_filter:
         print(f"🔧 Tool filtering enabled - loading endpoints from JSON files...")
@@ -256,7 +256,7 @@ def create_config(base_url: str, servers_data: List[Tuple], output_file: str = "
             print("⚠️  No endpoint files found - no filtering will be applied")
             print(f"💡 Make sure *_endpoints.json files exist in {servers_dir}")
 
-    # Pridaj servery
+    # Add servers
     for server in servers_data:
         if len(server) >= 4:
             name, command, args_str, env_str = server[:4]
@@ -265,11 +265,11 @@ def create_config(base_url: str, servers_data: List[Tuple], output_file: str = "
             print(f"Warning: Incomplete server data: {server}")
             continue
 
-        # Parsuj args a env
+        # Parse args and env
         args_list = parse_args_string(args_str)
         env_dict = parse_env_string(env_str)
 
-        # Ak nie sú dostupné detaily, použi predvolené
+        # If details are not available, use defaults
         if not command:
             command = "python"
         if not args_list:
@@ -289,7 +289,7 @@ def create_config(base_url: str, servers_data: List[Tuple], output_file: str = "
             }
         }
 
-        # Pridaj toolFilter na základe endpoints.json ak máme definované nástroje
+        # Add toolFilter based on endpoints.json if tools are defined
         if enable_filter and name in server_tools_from_json:
             tools = server_tools_from_json[name]
             server_config["options"]["toolFilter"] = {
@@ -304,7 +304,7 @@ def create_config(base_url: str, servers_data: List[Tuple], output_file: str = "
 
         config["mcpServers"][name] = server_config
 
-    # Zapíš do súboru
+    # Write to file
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
@@ -317,7 +317,7 @@ def create_config(base_url: str, servers_data: List[Tuple], output_file: str = "
 
 
 def load_url_from_env(env_file: str, var_name: str = "NGROK_URL") -> str:
-    """Načíta URL z .env súboru"""
+    """Loads URL from .env file"""
     if not os.path.exists(env_file):
         print(f"Warning: Environment file '{env_file}' not found!")
         return ""
@@ -337,14 +337,14 @@ def load_url_from_env(env_file: str, var_name: str = "NGROK_URL") -> str:
 
 
 def validate_url(url: str) -> bool:
-    """Validuje či URL má správny formát"""
+    """Validates if the URL has the correct format"""
     if not url:
         return False
     return url.startswith(('http://', 'https://'))
 
 
 def show_endpoints(config: Dict[str, Any]) -> None:
-    """Zobrazí dostupné endpointy s informáciami o filtrovaní"""
+    """Displays available endpoints with filtering information"""
     base_url = config.get("mcpProxy", {}).get("baseURL", "")
     servers = config.get("mcpServers", {})
 
@@ -360,7 +360,7 @@ def show_endpoints(config: Dict[str, Any]) -> None:
     for server_name, server_config in servers.items():
         endpoint = f"{base_url}/{server_name}/sse"
         
-        # Zobraz info o filtrovaní
+        # Display filtering info
         filter_info = ""
         if "toolFilter" in server_config.get("options", {}):
             tool_filter = server_config["options"]["toolFilter"]
@@ -377,7 +377,7 @@ def show_endpoints(config: Dict[str, Any]) -> None:
 
 
 def main():
-    """Hlavná funkcia"""
+    """Main function"""
     parser = argparse.ArgumentParser(
         description='Generate TBXark/mcp-proxy config with tool filtering based on *_endpoints.json files',
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -390,29 +390,29 @@ Examples:
         """
     )
 
-    # URL argumenty
+    # URL arguments
     url_group = parser.add_mutually_exclusive_group(required=True)
     url_group.add_argument('--url', help='Base URL (e.g., https://abc123.ngrok-free.app)')
     url_group.add_argument('--env-file', help='Load URL from .env file (default: .env)')
 
-    # Ostatné argumenty
+    # Other arguments
     parser.add_argument('--var-name', default='NGROK_URL', help='Environment variable name (default: NGROK_URL)')
     parser.add_argument('--db', default='./data/mcp_servers.db', help='Database path (default: ./data/mcp_servers.db)')
     parser.add_argument('--output', default='config.json', help='Output config file (default: config.json)')
     parser.add_argument('--show-endpoints', action='store_true', help='Show available endpoints after generation')
     parser.add_argument('--servers-dir', default='./servers', help='Directory with *_endpoints.json files (default: ./servers)')
     
-    # Argumenty pre filtrovanie
+    # Filtering arguments
     filter_group = parser.add_mutually_exclusive_group()
     filter_group.add_argument('--enable-filter', action='store_true', default=True, help='Enable tool filtering based on endpoints.json (default)')
     filter_group.add_argument('--no-filter', action='store_true', help='Disable tool filtering')
 
     args = parser.parse_args()
 
-    # Zistí či má povoliť filtrovanie
+    # Determine whether to enable filtering
     enable_filter = not args.no_filter
 
-    # Získaj URL
+    # Get URL
     if args.url:
         base_url = args.url
     else:
@@ -422,7 +422,7 @@ Examples:
             print(f"Error: Could not load {args.var_name} from {env_file}")
             sys.exit(1)
 
-    # Validuj URL
+    # Validate URL
     if not validate_url(base_url):
         print(f"Error: Invalid URL format: {base_url}")
         print("URL must start with http:// or https://")
@@ -433,7 +433,7 @@ Examples:
     print(f"📁 Servers directory: {args.servers_dir}")
     print(f"🔧 Tool filtering: {'enabled' if enable_filter else 'disabled'}")
 
-    # Načítaj servery (kombinuje API status + DB config)
+    # Load servers (combines API status + DB config)
     servers = load_servers_from_db(args.db)
 
     if not servers:
@@ -449,14 +449,14 @@ Examples:
         command = server[1] if len(server) > 1 else "python"
         print(f"  {i}. {name} ({command})")
 
-    # Vytvor config
+    # Create config
     config = create_config(base_url, servers, args.output, enable_filter, args.servers_dir)
 
     if not config:
         print("❌ Failed to create config!")
         sys.exit(1)
 
-    # Zobraz endpointy
+    # Display endpoints
     if args.show_endpoints:
         show_endpoints(config)
 

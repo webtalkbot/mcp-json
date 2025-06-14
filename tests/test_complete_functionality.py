@@ -152,35 +152,47 @@ class MCPTransportTester:
                         tools_count = len(data["tools"])
                         logger.info(f"✅ Global Tools List: OK ({tools_count} tools)")
 
-                        # Test tool call
-                        first_tool = data["tools"][0]
-                        tool_name = first_tool["name"]
+                        # Test tool call: Use a specific tool that requires no arguments, e.g., opensubtitles__get_languages
+                        # Note: The tools are double-namespaced as server_name__server_name__tool_name
+                        target_tool_name = "opensubtitles__opensubtitles__get_languages"
+                        
+                        # Verify if the target tool exists in the list
+                        tool_found = False
+                        for tool in data["tools"]:
+                            if tool["name"] == target_tool_name:
+                                tool_found = True
+                                break
+                        
+                        if tool_found:
+                            call_request = {
+                                "name": target_tool_name,
+                                "arguments": {} # get_languages requires no arguments
+                            }
 
-                        call_request = {
-                            "name": tool_name,
-                            "arguments": {}
-                        }
-
-                        async with self.session.post(
-                            f"{self.base_url}/mcp/tools/call",
-                            json=call_request,
-                            headers={"Content-Type": "application/json"}
-                        ) as call_response:
-                            if call_response.status == 200:
-                                call_data = await call_response.json()
-                                if "content" in call_data:
-                                    results["global_tools_call"] = True
-                                    logger.info(f"✅ Global Tools Call: OK (tool: {tool_name})")
+                            async with self.session.post(
+                                f"{self.base_url}/mcp/tools/call",
+                                json=call_request,
+                                headers={"Content-Type": "application/json"}
+                            ) as call_response:
+                                if call_response.status == 200:
+                                    call_data = await call_response.json()
+                                    # Expecting a list of languages in the content
+                                    if "content" in call_data and isinstance(call_data["content"], list) and len(call_data["content"]) > 0:
+                                        results["global_tools_call"] = True
+                                        logger.info(f"✅ Global Tools Call: OK (tool: {target_tool_name})")
+                                    else:
+                                        results["global_tools_call"] = False
+                                        logger.error(f"❌ Global Tools Call: Invalid response format for {target_tool_name}")
                                 else:
                                     results["global_tools_call"] = False
-                                    logger.error("❌ Global Tools Call: Invalid response format")
-                            else:
-                                results["global_tools_call"] = False
-                                logger.error(f"❌ Global Tools Call: HTTP {call_response.status}")
+                                    logger.error(f"❌ Global Tools Call: HTTP {call_response.status} for {target_tool_name}")
+                        else:
+                            results["global_tools_call"] = False
+                            logger.error(f"❌ Global Tools Call: Target tool '{target_tool_name}' not found in global tools list.")
                     else:
                         results["global_tools_list"] = False
                         results["global_tools_call"] = False
-                        logger.error("❌ Global Tools List: No tools found")
+                        logger.error("❌ Global Tools List: No tools found or invalid format")
                 else:
                     results["global_tools_list"] = False
                     results["global_tools_call"] = False
@@ -241,6 +253,11 @@ async def main():
     print("=" * 80)
     print("🧪 MCP WRAPPER COMPREHENSIVE FUNCTIONALITY TEST")
     print("=" * 80)
+
+    # IMPORTANT: For the 'opensubtitles' server to function correctly,
+    # the OPENSUBTITLES_API_KEY environment variable must be set.
+    # Example: export OPENSUBTITLES_API_KEY="YOUR_API_KEY"
+    # Without this, tool calls to opensubtitles server will likely fail.
 
     async with MCPTransportTester() as tester:
         # Spustíme všetky testy
