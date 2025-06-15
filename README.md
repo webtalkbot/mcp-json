@@ -170,7 +170,7 @@ ngrok http --url=pro-kingfish-constantly.ngrok-free.app 9000
 
 #### Update .env with your ngrok domain in NGROK_URL.
 
-Connect to Claude.ai using:
+Connect to Claude.ai using :
 https://<your_ngrok_domain>/<server_name>/sse
 
 Example for OpenSubtitles:
