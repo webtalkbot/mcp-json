@@ -141,8 +141,23 @@ Alternatively, use a reverse proxy (e.g., Nginx or Apache).
 
 #### Using Ngrok for Testing
 
-Install ngrok and start a tunnel:
+All info how to install ngrok: https://ngrok.com/docs/getting-started/
 
+Open a new terminal, install ngrok:
+
+```
+brew install ngrok 
+```
+
+Sign up for an ngrok account. Copy your ngrok authtoken from your ngrok dashboard.
+
+```
+ngrok config add-authtoken <TOKEN>
+```
+
+Info about ngrok 
+
+Start a tunnel:
 ```
 ngrok http --url=<your_ngrok_domain> 9000
 ```
