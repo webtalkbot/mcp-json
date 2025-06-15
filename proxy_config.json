@@ -1,0 +1,32 @@
+{
+  "mcpProxy": {
+    "authTokens": [],
+    "endpoint": "http://localhost:9000"
+  },
+  "mcpServers": {
+    "coingecko": {
+      "command": "python",
+      "args": [
+        "concurrent_mcp_server.py",
+        "--mode",
+        "public"
+      ],
+      "env": {
+        "MCP_SERVER_NAME": "coingecko",
+        "MCP_TRANSPORT": "sse"
+      }
+    },
+    "opensubtitles": {
+      "command": "python",
+      "args": [
+        "concurrent_mcp_server.py",
+        "--mode",
+        "public"
+      ],
+      "env": {
+        "MCP_SERVER_NAME": "opensubtitles",
+        "MCP_TRANSPORT": "sse"
+      }
+    }
+  }
+}
