@@ -120,3 +120,4 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     batch_convert_openapi_files(args.directory, args.pattern)
+
