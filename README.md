@@ -27,10 +27,18 @@ On macOS, use Homebrew:
 brew install go
 ```
 
-#### Configure Go path (if you are using zsh)
+#### Configure Go path 
+
+(if you are using zsh)
 
 ```
 echo 'export PATH="$PATH:/usr/local/go/bin:$HOME/go/bin"' >> ~/.zshrc && source ~/.zshrc
+```
+
+(if you are using bash)
+
+```
+echo 'export PATH="$PATH:/usr/local/go/bin:$HOME/go/bin"' >> ~/.bashrc && source ~/.bashrc
 ```
 
 #### Install MCP Proxy Server:
