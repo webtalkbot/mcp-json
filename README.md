@@ -63,6 +63,12 @@ git clone https://github.com/<repository-url>
 cd mcp-json
 ```
 
+#### Install the Required Packages:
+
+```
+pip install -r requirements.txt
+```
+
 #### Configure Environment Variables:
 
 Copy env.example to .env or create a new .env file.
