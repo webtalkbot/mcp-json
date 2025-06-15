@@ -174,7 +174,7 @@ Connect to Claude.ai using:
 https://<your_ngrok_domain>/<server_name>/sse
 
 Example for OpenSubtitles:
-https://pro-kingfish-constantly.ngrok-free.app/opensubtitles/sse
+https://pro-kingfish-constantly.ngrok-free.app/coingecko/sse
 
 ### Notes
 - Ensure the PROXY_PORT in .env matches the port used in ngrok or your custom domain setup.
