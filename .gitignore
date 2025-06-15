@@ -1,6 +1,9 @@
 # Git-Push File
 git-push.sh
 
+# No config files
+*_config.json
+
 # Environment files
 .env
 
