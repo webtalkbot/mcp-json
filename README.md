@@ -18,10 +18,19 @@ The MCP JSON Server allows you to create and manage MCP servers using JSON confi
 ### Step 1: Install MCP Proxy Server
 
 Refer to https://github.com/TBXark/mcp-proxy for detailed instructions. For a quick setup:
-Install Go (if not installed). On macOS, use Homebrew:
+
+#### Install Go (if not installed). 
+
+On macOS, use Homebrew:
 
 ```
 brew install go
+```
+
+#### Configure Go path (if you are using zsh)
+
+```
+echo 'export PATH="$PATH:/usr/local/go/bin:$HOME/go/bin"' >> ~/.zshrc && source ~/.zshrc
 ```
 
 #### Install MCP Proxy Server:
