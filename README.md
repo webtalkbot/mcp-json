@@ -181,3 +181,4 @@ https://pro-kingfish-constantly.ngrok-free.app/opensubtitles/sse
 - For production, replace ngrok with a dedicated domain and secure hosting.
 - Security enhancements and additional features are planned for future releases.
 - For further assistance, refer to https://github.com/TBXark/mcp-proxy or the repository's issue tracker.
+- Don't forget to update your .env file after obtaining your ngrok domain 
