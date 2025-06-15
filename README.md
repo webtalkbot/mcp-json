@@ -159,7 +159,7 @@ Info about ngrok
 
 Start a tunnel:
 ```
-ngrok http --url=<your_ngrok_domain> 9000
+./ngrok-tunnel.sh
 ```
 
 Example for pro-kingfish-constantly.ngrok-free.app:
