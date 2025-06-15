@@ -139,6 +139,7 @@ Example: http://mymcpservers.com:9000/opensubtitles/sse
 
 Alternatively, use a reverse proxy (e.g., Nginx or Apache).
 
+
 ### Step 6: Use Ngrok for Testing (If you don't have your own public server)
 
 All info how to install ngrok: https://ngrok.com/docs/getting-started/
