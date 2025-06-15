@@ -137,7 +137,7 @@ With your own domain (set in NGROK_URL), combine it with the PROXY_PORT from .en
 
 Example: http://mymcpservers.com:9000/opensubtitles/sse
 
-Alternatively, use a reverse proxy (e.g., Nginx or Apache).
+Alternatively, use a reverse proxy (e.g., Nginx or Apache).  
 
 
 ### Step 6: Use Ngrok for Testing (If you don't have your own public server)
