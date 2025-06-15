@@ -848,30 +848,10 @@ Usage examples:
             server_dir = converter.save_mcp_files(server_name, endpoints, security_config)
 
             # Check if mcp_manager.py exists
-            if os.path.exists('mcp_manager.py'):
-                print(f"\n🤖 Automatic server registration...")
-                try:
-                    import subprocess
-                    cmd = [
-                        sys.executable, 'mcp_manager.py', 'add', server_name, 'concurrent_mcp_server.py',
-                        '--description', f'Converted from OpenAPI ({args.openapi_file})',
-                        '--transport', 'sse',
-                        '--mode', 'public'
-                    ]
-
-                    result = subprocess.run(cmd, capture_output=True, text=True)
-                    if result.returncode == 0:
-                        print(f"   ✅ Server automatically registered!")
-                        print(f"   📋 Output: {result.stdout.strip()}")
-                    else:
-                        print(f"   ⚠️  Registration failed: {result.stderr.strip()}")
-                        print(f"   💡 Run manually: python mcp_manager.py add {server_name} ...")
-
-                except Exception as e:
-                    print(f"   ⚠️  Error during automatic registration: {e}")
-                    print(f"   💡 Run registration manually")
-            else:
-                print(f"   💡 mcp_manager.py not found - run registration manually")
+            print(f"\n💡 To register this server manually:")
+            print(f"   python mcp_manager.py add {server_name} concurrent_mcp_server.py \\")
+            print(f"       --description 'Converted from OpenAPI' \\")
+            print(f"       --transport sse --mode public")
 
     except KeyboardInterrupt:
         print(f"\n⏹️  Conversion interrupted by user")
@@ -889,10 +869,9 @@ Usage examples:
         if temp_file_path and os.path.exists(temp_file_path):
             try:
                 os.unlink(temp_file_path)
-                print(f"🗑️  Temporary file cleaned up")
+                print(f"�️  Temporary file cleaned up")
             except:
                 pass
 
 if __name__ == "__main__":
     main()
-
