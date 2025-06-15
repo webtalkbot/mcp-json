@@ -1,0 +1,1 @@
+python openapi_to_mcp-json.py https://raw.githubusercontent.com/coingecko/coingecko-api-oas/refs/heads/main/coingecko-public-api-v3.json --name coingecko
