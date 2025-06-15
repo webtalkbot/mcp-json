@@ -59,7 +59,7 @@ conda activate mcp-json
 #### Clone the Repository:
 
 ```
-git clone https://github.com/<repository-url>
+git clone https://github.com/webtalkbot/mcp-json.git
 cd mcp-json
 ```
 
