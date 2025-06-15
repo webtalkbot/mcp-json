@@ -1,212 +1,405 @@
 {
-  "ping": {
+  "ping_server": {
+    "method": "GET",
     "url": "https://api.coingecko.com/api/v3/ping",
-    "method": "GET",
-    "description": "Check the API server status"
+    "description": "Check API server status",
+    "timeout": 30
   },
-  "get_price": {
+  "simple_price": {
+    "method": "GET",
     "url": "https://api.coingecko.com/api/v3/simple/price",
-    "method": "GET",
-    "description": "Get current price of one or more coins in any currency",
+    "description": "Coin Price by IDs",
     "query_params": {
-      "ids": "bitcoin,ethereum,solana",
-      "vs_currencies": "usd,eur",
-      "include_market_cap": "true",
-      "include_24hr_vol": "true",
-      "include_24hr_change": "true",
-      "include_last_updated_at": "true"
-    }
+      "vs_currencies": "{vs_currencies}",
+      "ids": "bitcoin",
+      "names": "Bitcoin",
+      "symbols": "btc",
+      "include_tokens": "top",
+      "include_market_cap": "{include_market_cap}",
+      "include_24hr_vol": "{include_24hr_vol}",
+      "include_24hr_change": "{include_24hr_change}",
+      "include_last_updated_at": "{include_last_updated_at}",
+      "precision": "full"
+    },
+    "timeout": 30
   },
-  "get_token_price": {
+  "simple_token_price": {
+    "method": "GET",
     "url": "https://api.coingecko.com/api/v3/simple/token_price/{id}",
-    "method": "GET",
-    "description": "Get price of tokens by contract address",
+    "description": "Coin Price by Token Addresses",
     "path_params": {
-      "id": "ethereum"
+      "id": "{id}"
     },
     "query_params": {
-      "contract_addresses": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-      "vs_currencies": "usd"
-    }
+      "contract_addresses": "{contract_addresses}",
+      "vs_currencies": "{vs_currencies}",
+      "include_market_cap": "{include_market_cap}",
+      "include_24hr_vol": "{include_24hr_vol}",
+      "include_24hr_change": "{include_24hr_change}",
+      "include_last_updated_at": "{include_last_updated_at}",
+      "precision": "full"
+    },
+    "timeout": 30
   },
-  "get_supported_currencies": {
+  "simple_supported_currencies": {
+    "method": "GET",
     "url": "https://api.coingecko.com/api/v3/simple/supported_vs_currencies",
-    "method": "GET",
-    "description": "Get list of all supported currencies"
+    "description": "Supported Currencies List",
+    "timeout": 30
   },
-  "get_coins_list": {
+  "coins_list": {
+    "method": "GET",
     "url": "https://api.coingecko.com/api/v3/coins/list",
-    "method": "GET",
-    "description": "Get list of all supported coins with ID, name and symbol",
+    "description": "Coins List (ID Map)",
     "query_params": {
-      "include_platform": "false"
-    }
+      "include_platform": "{include_platform}"
+    },
+    "timeout": 30
   },
-  "get_coins_markets": {
+  "coins_markets": {
+    "method": "GET",
     "url": "https://api.coingecko.com/api/v3/coins/markets",
-    "method": "GET",
-    "description": "Get coins with price, market cap, volume and market data",
+    "description": "Coins List with Market Data",
     "query_params": {
-      "vs_currency": "usd",
-      "order": "market_cap_desc",
-      "per_page": "100",
+      "vs_currency": "{vs_currency}",
+      "ids": "bitcoin",
+      "names": "Bitcoin",
+      "symbols": "btc",
+      "include_tokens": "top",
+      "category": "{category}",
+      "order": "market_cap_asc",
+      "per_page": "1",
       "page": "1",
-      "sparkline": "false",
-      "locale": "en"
-    }
+      "sparkline": "{sparkline}",
+      "price_change_percentage": "1h",
+      "locale": "ar",
+      "precision": "full"
+    },
+    "timeout": 30
   },
-  "get_coin_details": {
+  "coins_id": {
+    "method": "GET",
     "url": "https://api.coingecko.com/api/v3/coins/{id}",
-    "method": "GET",
-    "description": "Get all metadata for a specific coin",
+    "description": "Coin Data by ID",
     "path_params": {
-      "id": "bitcoin"
+      "id": "{id}"
     },
     "query_params": {
-      "localization": "false",
-      "tickers": "false",
-      "market_data": "true",
-      "community_data": "false",
-      "developer_data": "false",
-      "sparkline": "false"
-    }
+      "localization": "{localization}",
+      "tickers": "{tickers}",
+      "market_data": "{market_data}",
+      "community_data": "{community_data}",
+      "developer_data": "{developer_data}",
+      "sparkline": "{sparkline}",
+      "dex_pair_format": "contract_address"
+    },
+    "timeout": 30
   },
-  "get_coin_tickers": {
+  "coins_id_tickers": {
+    "method": "GET",
     "url": "https://api.coingecko.com/api/v3/coins/{id}/tickers",
-    "method": "GET",
-    "description": "Get coin tickers on CEX and DEX exchanges",
+    "description": "Coin Tickers by ID",
     "path_params": {
-      "id": "bitcoin"
+      "id": "{id}"
     },
     "query_params": {
-      "exchange_ids": "",
-      "include_exchange_logo": "false",
+      "exchange_ids": "{exchange_ids}",
+      "include_exchange_logo": "{include_exchange_logo}",
       "page": "1",
-      "order": "trust_score_desc"
-    }
+      "order": "trust_score_desc",
+      "depth": "{depth}",
+      "dex_pair_format": "contract_address"
+    },
+    "timeout": 30
   },
-  "get_coin_history": {
+  "coins_id_history": {
+    "method": "GET",
     "url": "https://api.coingecko.com/api/v3/coins/{id}/history",
-    "method": "GET",
-    "description": "Get historical data for a coin at a specific date",
+    "description": "Coin Historical Data by ID",
     "path_params": {
-      "id": "bitcoin"
+      "id": "{id}"
     },
     "query_params": {
-      "date": "30-12-2023",
-      "localization": "false"
-    }
+      "date": "{date}",
+      "localization": "{localization}"
+    },
+    "timeout": 30
   },
-  "get_coin_market_chart": {
+  "coins_id_market_chart": {
+    "method": "GET",
     "url": "https://api.coingecko.com/api/v3/coins/{id}/market_chart",
-    "method": "GET",
-    "description": "Get historical chart data (price, market cap, volume)",
+    "description": "Coin Historical Chart Data by ID",
     "path_params": {
-      "id": "bitcoin"
+      "id": "{id}"
     },
     "query_params": {
-      "vs_currency": "usd",
-      "days": "7",
-      "interval": "daily"
-    }
+      "vs_currency": "{vs_currency}",
+      "days": "{days}",
+      "interval": "daily",
+      "precision": "full"
+    },
+    "timeout": 30
   },
-  "get_coin_market_chart_range": {
+  "coins_id_market_chart_range": {
+    "method": "GET",
     "url": "https://api.coingecko.com/api/v3/coins/{id}/market_chart/range",
-    "method": "GET",
-    "description": "Get historical chart data within time range",
+    "description": "Coin Historical Chart Data within Time Range by ID",
     "path_params": {
-      "id": "bitcoin"
+      "id": "{id}"
     },
     "query_params": {
-      "vs_currency": "usd",
-      "from": "1609459200",
-      "to": "1640995200"
-    }
+      "vs_currency": "{vs_currency}",
+      "from": "{from}",
+      "to": "{to}",
+      "precision": "full"
+    },
+    "timeout": 30
   },
-  "get_coin_ohlc": {
+  "coins_id_ohlc": {
+    "method": "GET",
     "url": "https://api.coingecko.com/api/v3/coins/{id}/ohlc",
-    "method": "GET",
-    "description": "Get OHLC (Open, High, Low, Close) data",
+    "description": "Coin OHLC Chart by ID",
     "path_params": {
-      "id": "bitcoin"
+      "id": "{id}"
     },
     "query_params": {
-      "vs_currency": "usd",
-      "days": "7"
-    }
+      "vs_currency": "{vs_currency}",
+      "days": "{days}",
+      "precision": "full"
+    },
+    "timeout": 30
   },
-  "get_trending": {
-    "url": "https://api.coingecko.com/api/v3/search/trending",
+  "coins_contract_address": {
     "method": "GET",
-    "description": "Get trending coins, NFTs and categories in last 24h"
-  },
-  "get_global_data": {
-    "url": "https://api.coingecko.com/api/v3/global",
-    "method": "GET",
-    "description": "Get cryptocurrency global market data"
-  },
-  "get_global_defi": {
-    "url": "https://api.coingecko.com/api/v3/global/decentralized_finance_defi",
-    "method": "GET",
-    "description": "Get global DeFi market data"
-  },
-  "search": {
-    "url": "https://api.coingecko.com/api/v3/search",
-    "method": "GET",
-    "description": "Search for coins, categories and markets",
-    "query_params": {
-      "query": "bitcoin"
-    }
-  },
-  "get_exchanges": {
-    "url": "https://api.coingecko.com/api/v3/exchanges",
-    "method": "GET",
-    "description": "Get list of exchanges with trading data",
-    "query_params": {
-      "per_page": "100",
-      "page": "1"
-    }
-  },
-  "get_exchange_details": {
-    "url": "https://api.coingecko.com/api/v3/exchanges/{id}",
-    "method": "GET",
-    "description": "Get exchange data by exchange ID",
+    "url": "https://api.coingecko.com/api/v3/coins/{id}/contract/{contract_address}",
+    "description": "Coin Data by Token Address",
     "path_params": {
-      "id": "binance"
-    }
+      "id": "{id}",
+      "contract_address": "{contract_address}"
+    },
+    "timeout": 30
   },
-  "get_categories": {
-    "url": "https://api.coingecko.com/api/v3/coins/categories",
+  "contract_address_market_chart": {
     "method": "GET",
-    "description": "Get all coin categories with market data",
+    "url": "https://api.coingecko.com/api/v3/coins/{id}/contract/{contract_address}/market_chart",
+    "description": "Coin Historical Chart Data by Token Address",
+    "path_params": {
+      "id": "{id}",
+      "contract_address": "{contract_address}"
+    },
     "query_params": {
-      "order": "market_cap_desc"
-    }
+      "vs_currency": "{vs_currency}",
+      "days": "{days}",
+      "interval": "daily",
+      "precision": "full"
+    },
+    "timeout": 30
   },
-  "get_categories_list": {
-    "url": "https://api.coingecko.com/api/v3/coins/categories/list",
+  "contract_address_market_chart_range": {
     "method": "GET",
-    "description": "Get list of all coin categories"
+    "url": "https://api.coingecko.com/api/v3/coins/{id}/contract/{contract_address}/market_chart/range",
+    "description": "Coin Historical Chart Data within Time Range by Token Address",
+    "path_params": {
+      "id": "{id}",
+      "contract_address": "{contract_address}"
+    },
+    "query_params": {
+      "vs_currency": "{vs_currency}",
+      "from": "{from}",
+      "to": "{to}",
+      "precision": "full"
+    },
+    "timeout": 30
   },
-  "get_exchange_rates": {
-    "url": "https://api.coingecko.com/api/v3/exchange_rates",
+  "asset_platforms_list": {
     "method": "GET",
-    "description": "Get BTC exchange rates with other currencies"
-  },
-  "get_asset_platforms": {
     "url": "https://api.coingecko.com/api/v3/asset_platforms",
-    "method": "GET",
-    "description": "Get all asset platforms (blockchain networks)",
+    "description": "Asset Platforms List (ID Map)",
     "query_params": {
       "filter": "nft"
-    }
+    },
+    "timeout": 30
   },
-  "get_companies_holdings": {
-    "url": "https://api.coingecko.com/api/v3/companies/public_treasury/{coin_id}",
+  "coins_categories_list": {
     "method": "GET",
-    "description": "Get public companies' crypto holdings",
+    "url": "https://api.coingecko.com/api/v3/coins/categories/list",
+    "description": "Coins Categories List (ID Map)",
+    "timeout": 30
+  },
+  "coins_categories": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/coins/categories",
+    "description": "Coins Categories List with Market Data",
+    "query_params": {
+      "order": "market_cap_desc"
+    },
+    "timeout": 30
+  },
+  "exchanges": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/exchanges",
+    "description": "Exchanges List with data",
+    "query_params": {
+      "per_page": "1",
+      "page": "1"
+    },
+    "timeout": 30
+  },
+  "exchanges_list": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/exchanges/list",
+    "description": "Exchanges List (ID Map)",
+    "query_params": {
+      "status": "active"
+    },
+    "timeout": 30
+  },
+  "exchanges_id": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/exchanges/{id}",
+    "description": "Exchange Data by ID",
     "path_params": {
-      "coin_id": "bitcoin"
-    }
+      "id": "{id}"
+    },
+    "query_params": {
+      "dex_pair_format": "contract_address"
+    },
+    "timeout": 30
+  },
+  "exchanges_id_tickers": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/exchanges/{id}/tickers",
+    "description": "Exchange Tickers by ID",
+    "path_params": {
+      "id": "{id}"
+    },
+    "query_params": {
+      "coin_ids": "bitcoin",
+      "include_exchange_logo": "{include_exchange_logo}",
+      "page": "1",
+      "depth": "{depth}",
+      "order": "trust_score_desc",
+      "dex_pair_format": "contract_address"
+    },
+    "timeout": 30
+  },
+  "exchanges_id_volume_chart": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/exchanges/{id}/volume_chart",
+    "description": "Exchange Volume Chart by ID",
+    "path_params": {
+      "id": "{id}"
+    },
+    "query_params": {
+      "days": "{days}"
+    },
+    "timeout": 30
+  },
+  "derivatives_tickers": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/derivatives",
+    "description": "Derivatives Tickers List",
+    "timeout": 30
+  },
+  "derivatives_exchanges": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/derivatives/exchanges",
+    "description": "Derivatives Exchanges List with Data",
+    "query_params": {
+      "order": "name_asc",
+      "per_page": "1",
+      "page": "1"
+    },
+    "timeout": 30
+  },
+  "derivatives_exchanges_id": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/derivatives/exchanges/{id}",
+    "description": "Derivatives Exchange Data by ID",
+    "path_params": {
+      "id": "{id}"
+    },
+    "query_params": {
+      "include_tickers": "all"
+    },
+    "timeout": 30
+  },
+  "derivatives_exchanges_list": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/derivatives/exchanges/list",
+    "description": "Derivatives Exchanges List (ID Map)",
+    "timeout": 30
+  },
+  "nfts_list": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/nfts/list",
+    "description": "NFTs List (ID Map)",
+    "query_params": {
+      "order": "h24_volume_usd_asc",
+      "per_page": "1",
+      "page": "1"
+    },
+    "timeout": 30
+  },
+  "nfts_id": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/nfts/{id}",
+    "description": "NFTs Collection Data by ID",
+    "path_params": {
+      "id": "{id}"
+    },
+    "timeout": 30
+  },
+  "nfts_contract_address": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/nfts/{asset_platform_id}/contract/{contract_address}",
+    "description": "NFTs Collection Data by Contract Address",
+    "path_params": {
+      "asset_platform_id": "{asset_platform_id}",
+      "contract_address": "{contract_address}"
+    },
+    "timeout": 30
+  },
+  "exchange_rates": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/exchange_rates",
+    "description": "BTC-to-Currency Exchange Rates",
+    "timeout": 30
+  },
+  "search_data": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/search",
+    "description": "Search Queries",
+    "query_params": {
+      "query": "{query}"
+    },
+    "timeout": 30
+  },
+  "trending_search": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/search/trending",
+    "description": "Trending Search List",
+    "timeout": 30
+  },
+  "crypto_global": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/global",
+    "description": "Crypto Global Market Data",
+    "timeout": 30
+  },
+  "global_defi": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/global/decentralized_finance_defi",
+    "description": "Global De-Fi Market Data",
+    "timeout": 30
+  },
+  "companies_public_treasury": {
+    "method": "GET",
+    "url": "https://api.coingecko.com/api/v3/companies/public_treasury/{coin_id}",
+    "description": "Public Companies Holdings",
+    "path_params": {
+      "coin_id": "{coin_id}"
+    },
+    "timeout": 30
   }
 }

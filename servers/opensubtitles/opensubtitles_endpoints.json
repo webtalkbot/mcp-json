@@ -1,26 +1,171 @@
 {
-  "search_subtitles": {
+  "login": {
+    "method": "POST",
+    "url": "https://api.opensubtitles.com/api/v1/login",
+    "description": "Login",
+    "body_template": "{\"username\": \"{username}\", \"password\": \"{password}\"}",
+    "timeout": 60
+  },
+  "logout": {
+    "method": "DELETE",
+    "url": "https://api.opensubtitles.com/api/v1/logout",
+    "description": "Logout",
+    "timeout": 30
+  },
+  "formats": {
+    "method": "GET",
+    "url": "https://api.opensubtitles.com/api/v1/infos/formats",
+    "description": "Subtitle Formats",
+    "timeout": 30
+  },
+  "languages": {
+    "method": "GET",
+    "url": "https://api.opensubtitles.com/api/v1/infos/languages",
+    "description": "Languages",
+    "timeout": 30
+  },
+  "userinfo": {
+    "method": "GET",
+    "url": "https://api.opensubtitles.com/api/v1/infos/user",
+    "description": "User Informations",
+    "timeout": 30
+  },
+  "popular": {
+    "method": "GET",
+    "url": "https://api.opensubtitles.com/api/v1/discover/popular",
+    "description": "Popular features",
+    "query_params": {
+      "language": "{language}",
+      "type": "{type}"
+    },
+    "timeout": 30
+  },
+  "latest": {
+    "method": "GET",
+    "url": "https://api.opensubtitles.com/api/v1/discover/latest",
+    "description": "Latest subtitles",
+    "query_params": {
+      "language": "{language}",
+      "type": "{type}"
+    },
+    "timeout": 30
+  },
+  "most_downloaded": {
+    "method": "GET",
+    "url": "https://api.opensubtitles.com/api/v1/discover/most_downloaded",
+    "description": "Most downloaded subtitles",
+    "query_params": {
+      "language": "{language}",
+      "type": "{type}"
+    },
+    "timeout": 30
+  },
+  "features": {
+    "method": "GET",
+    "url": "https://api.opensubtitles.com/api/v1/features",
+    "description": "Search for features",
+    "query_params": {
+      "query": "{query}",
+      "type": "{type}",
+      "feature_id": "1",
+      "imdb_id": "{imdb_id}",
+      "tmdb_id": "{tmdb_id}",
+      "year": "1",
+      "query_match": "{query_match}",
+      "full_search": "{full_search}"
+    },
+    "timeout": 30
+  },
+  "subtitles": {
     "method": "GET",
     "url": "https://api.opensubtitles.com/api/v1/subtitles",
     "description": "Search for subtitles by title and language",
     "query_params": {
       "query": "{query}",
       "languages": "{languages}",
-      "page": "{page}"
+      "page": "1"
     },
     "timeout": 30
   },
-  "get_languages": {
-    "method": "GET",
-    "url": "https://api.opensubtitles.com/api/v1/infos/languages",
-    "description": "Get list of supported languages",
-    "timeout": 15
-  },
-  "download_subtitle": {
+  "download": {
     "method": "POST",
     "url": "https://api.opensubtitles.com/api/v1/download",
-    "description": "Download subtitle file - returns download link",
-    "body_template": "{\"file_id\": {file_id}}",
+    "description": "Download",
+    "body_template": "{\"file_id\": \"{file_id}\", \"sub_format\": \"{sub_format}\", \"file_name\": \"{file_name}\", \"in_fps\": \"{in_fps}\", \"out_fps\": \"{out_fps}\", \"timeshift\": \"{timeshift}\", \"force_download\": \"{force_download}\"}",
+    "timeout": 60
+  },
+  "guessit": {
+    "method": "GET",
+    "url": "https://api.opensubtitles.com/api/v1/utilities/guessit",
+    "description": "Guessit",
+    "query_params": {
+      "filename": "{filename}"
+    },
+    "timeout": 30
+  },
+  "get_credits": {
+    "method": "GET",
+    "url": "https://api.opensubtitles.com/api/v1/ai/credits",
+    "description": "User Credits Informations",
+    "timeout": 30
+  },
+  "buy_credits": {
+    "method": "GET",
+    "url": "https://api.opensubtitles.com/api/v1/ai/credits/buy",
+    "description": "Buy Credits",
+    "timeout": 30
+  },
+  "translation": {
+    "method": "GET",
+    "url": "https://api.opensubtitles.com/api/v1/ai/info/translation",
+    "description": "AI Translation",
+    "timeout": 30
+  },
+  "transcription": {
+    "method": "GET",
+    "url": "https://api.opensubtitles.com/api/v1/ai/info/transcription",
+    "description": "AI Transcription",
+    "timeout": 30
+  },
+  "translate": {
+    "method": "POST",
+    "url": "https://api.opensubtitles.com/api/v1/ai/translate",
+    "description": "AI Translate",
+    "query_params": {
+      "api": "{api}",
+      "file": "{file}",
+      "translate_from": "auto",
+      "translate_to": "{translate_to}"
+    },
+    "timeout": 60
+  },
+  "transcribe": {
+    "method": "POST",
+    "url": "https://api.opensubtitles.com/api/v1/ai/transcribe",
+    "description": "AI Transcribe",
+    "query_params": {
+      "api": "{api}",
+      "file": "{file}",
+      "language": "{language}"
+    },
+    "timeout": 60
+  },
+  "translate_status": {
+    "method": "GET",
+    "url": "https://api.opensubtitles.com/api/v1/ai/translate/{correlation_id}",
+    "description": "AI Translate status",
+    "path_params": {
+      "correlation_id": "{correlation_id}"
+    },
+    "timeout": 30
+  },
+  "transcribe_status": {
+    "method": "GET",
+    "url": "https://api.opensubtitles.com/api/v1/ai/transcribe/{correlation_id}",
+    "description": "AI Transcribe status",
+    "path_params": {
+      "correlation_id": "{correlation_id}"
+    },
     "timeout": 30
   }
 }

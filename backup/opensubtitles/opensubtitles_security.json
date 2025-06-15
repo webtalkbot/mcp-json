@@ -1,0 +1,10 @@
+{
+  "provider_type": "custom_headers",
+  "config": {
+    "headers": {
+      "Api-Key": "${OPENSUBTITLES_API_KEY}",
+      "User-Agent": "MCP-OpenSubtitles/1.0",
+      "Content-Type": "application/json"
+    }
+  }
+}

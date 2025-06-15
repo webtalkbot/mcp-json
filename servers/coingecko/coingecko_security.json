@@ -1,3 +1,13 @@
 {
-  "provider_type": "none"
+  "provider_type": "custom_headers",
+  "config": {
+    "headers": {
+      "x-cg-demo-api-key": "${COINGECKO_API_KEY}",
+      "X-x_cg_demo_api_key": "${COINGECKO_API_KEY}",
+      "User-Agent": "MCP-Coingecko/1.0",
+      "Accept": "application/json",
+      "Content-Type": "application/json"
+    },
+    "test_url": "https://api.coingecko.com/api/v3/health"
+  }
 }

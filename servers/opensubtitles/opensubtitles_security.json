@@ -3,8 +3,11 @@
   "config": {
     "headers": {
       "Api-Key": "${OPENSUBTITLES_API_KEY}",
-      "User-Agent": "MCP-OpenSubtitles/1.0",
+      "Authorization": "Bearer ${OPENSUBTITLES_BEARER_TOKEN}",
+      "User-Agent": "MCP-Opensubtitles/1.0",
+      "Accept": "application/json",
       "Content-Type": "application/json"
-    }
+    },
+    "test_url": "https://api.opensubtitles.com/api/v1/health"
   }
 }

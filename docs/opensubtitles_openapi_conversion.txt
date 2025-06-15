@@ -1,0 +1,1 @@
+python openapi_to_mcp-json.py https://stoplight.io/api/v1/projects/opensubtitles/opensubtitles-api/nodes/open_api.json --name opensubtitles
