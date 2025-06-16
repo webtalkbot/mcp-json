@@ -69,12 +69,15 @@ def add_server(name: str, script_path: str, description: str = "", auto_start: b
         create_server_config(name, transport, mode)
         print(f"✅ Server {name} added successfully with {transport} transport")
 
-        # Try to inform API if available
+        # 🆕 NOVÉ: Automaticky regenerujeme config.json
         try:
-            requests.post(f"http://localhost:{PORT}/reload", timeout=2)
-            print(f"ℹ️  Notified API wrapper about new server")
-        except:
-            print(f"ℹ️  API wrapper not available (will pick up server on next start)")
+            regenerate_proxy_config()
+            print(f"✅ Proxy config.json updated")
+        except Exception as e:
+            print(f"⚠️  Warning: Could not update proxy config: {e}")
+
+        # Config updated
+        print(f"ℹ️  Config updated - restart API wrapper to use new config")
 
     else:
         print(f"❌ Failed to add server {name}")
@@ -82,6 +85,68 @@ def add_server(name: str, script_path: str, description: str = "", auto_start: b
 
     return True
 
+
+# 🆕 NOVÁ funkcia pre regeneráciu config.json
+def regenerate_proxy_config():
+    """Regenerate TBXark/mcp-proxy config.json from current database state"""
+    import subprocess
+    import sys
+    
+    print(f"🔄 Regenerating proxy config...")
+    
+    # Call generate_config.py to recreate config.json
+    result = subprocess.run([
+        sys.executable, 
+        "generate_config.py", 
+        "--env-file", ".env"
+    ], capture_output=True, text=True)
+    
+    if result.returncode == 0:
+        print(f"✅ Config regenerated successfully")
+        
+        print(f"ℹ️  Config updated - restart proxy to use new config")
+        
+        return True
+    else:
+        print(f"❌ Config regeneration failed: {result.stderr}")
+        return False
+
+def restart_proxy():
+    """Restart TBXark mcp-proxy with new config"""
+    import subprocess
+    import time
+    
+    try:
+        # 1. Find and kill existing proxy
+        print("🔄 Stopping existing proxy...")
+        subprocess.run(['pkill', '-f', 'mcp-proxy'], stderr=subprocess.DEVNULL)
+        
+        # 2. Wait for shutdown
+        time.sleep(2)
+        
+        # 3. Start new proxy IN BACKGROUND
+        print("🚀 Starting proxy with new config...")
+        proxy_cmd = [
+            os.path.expanduser("~/go/bin/mcp-proxy"),
+            "--config", "config.json"
+        ]
+        
+        # ✅ OPRAVA: Pridať stdout/stderr redirect + background
+        with open(os.devnull, 'w') as devnull:
+            process = subprocess.Popen(
+                proxy_cmd,
+                stdout=devnull,
+                stderr=devnull,
+                start_new_session=True  # ✅ Spustí v novej session (detached)
+            )
+        
+        print(f"✅ Proxy restarted (PID: {process.pid}) in background")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error restarting proxy: {e}")
+        return False
 
 def create_server_config(server_name: str, transport: str, mode: str):
     """Create server configuration file"""
@@ -387,7 +452,7 @@ def start_server_standalone(name: str):
             except Exception as e:
                 print(f"⚠️  Could not update database: {e}")
 
-            return True
+            success = True
         else:
             exit_code = process.poll()
             stderr_output = ""
@@ -399,10 +464,28 @@ def start_server_standalone(name: str):
             print(f"❌ Server {name} failed to start in standalone mode (exit code: {exit_code})")
             if stderr_output:
                 print(f"❌ Error output: {stderr_output}")
-            return False
+            success = False
 
     except Exception as e:
         print(f"❌ Error starting server {name}: {e}")
+        success = False
+
+    if success:  # ak sa server úspešne spustil
+        print(f"✅ Server {name} started successfully")
+        
+        # Regenerate config and restart proxy
+        try:
+            print("🔄 Updating proxy configuration...")
+            if regenerate_proxy_config():
+                restart_proxy()
+                print("✅ Proxy updated with new server")
+            else:
+                print("⚠️  Config regeneration failed, skipping proxy restart")
+        except Exception as e:
+            print(f"⚠️  Warning: Could not update proxy: {e}")
+        
+        return True
+    else:
         return False
 
 def stop_server(name: str):
@@ -505,6 +588,13 @@ def remove_server(name: str):
         # Remove from database
         if db.remove_server(name):
             print(f"✅ Server {name} removed from database")
+
+            # 🆕 NOVÉ: Automaticky regenerujeme config.json
+            try:
+                regenerate_proxy_config()
+                print(f"✅ Proxy config.json updated")
+            except Exception as e:
+                print(f"⚠️  Warning: Could not update proxy config: {e}")
 
             # Server directory is preserved
             server_dir = f"servers/{name}"

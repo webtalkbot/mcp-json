@@ -5,6 +5,7 @@ mcp_wrapper.py - FastAPI wrapper for MCP Server Manager with individual HTTP MCP
 
 import os
 import subprocess
+import sys
 import signal
 import time
 import threading
@@ -1513,15 +1514,56 @@ async def get_server(server_name: str):
 
 @app.post("/servers/{server_name}/start")
 async def start_server(server_name: str):
-    """Start MCP server"""
+    """Start MCP server and update proxy config"""
     try:
         success = await process_manager.start_server_async(server_name)
         if success:
+            # Update proxy config when server starts
+            try:
+                result = subprocess.run([
+                    sys.executable, "generate_config.py", "--env-file", ".env"
+                ], capture_output=True, text=True)
+                if result.returncode == 0:
+                    logger.info("Proxy config updated after server start")
+            except Exception as e:
+                logger.warning(f"Could not update proxy config: {e}")
+                
             return {"message": f"Server {server_name} started successfully"}
         else:
             raise HTTPException(status_code=400, detail=f"Failed to start server {server_name}")
     except Exception as e:
         logger.error(f"Error starting server: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/proxy/regenerate-config")
+async def regenerate_proxy_config():
+    """Regenerate proxy config.json from current database state"""
+    try:
+        import subprocess
+        import sys
+        
+        logger.info("Regenerating proxy config...")
+        
+        # Call generate_config.py to recreate config.json
+        result = subprocess.run([
+            sys.executable, 
+            "generate_config.py", 
+            "--env-file", ".env"
+        ], capture_output=True, text=True, cwd=".")
+        
+        if result.returncode == 0:
+            return {
+                "message": "Proxy config regenerated successfully",
+                "config_file": "config.json"
+            }
+        else:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Config regeneration failed: {result.stderr}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Error regenerating proxy config: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/servers/{server_name}/stop")

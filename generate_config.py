@@ -79,7 +79,7 @@ def get_running_servers_from_api(api_url: str = "http://localhost:8999") -> Dict
                     if isinstance(server, dict):
                         name = server.get('name', 'unknown')
                         status = server.get('status', 'unknown')
-                        if status == 'running':
+                        if status in ['running', 'stopped']:
                             running_servers[name] = {
                                 'pid': server.get('pid'),
                                 'transport': server.get('transport', 'sse'),
@@ -103,32 +103,101 @@ def get_running_servers_from_api(api_url: str = "http://localhost:8999") -> Dict
     return {}
 
 
+def get_all_servers_from_database(db_path: str) -> Dict[str, Dict]:
+    """
+    NEW: Get all servers from database (fallback when API unavailable)
+    Returns all servers from database regardless of their running status
+    """
+    servers = {}
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT name, config_data, auto_start, status
+            FROM mcp_servers
+        """)
+        
+        rows = cursor.fetchall()
+        
+        for name, config_data, auto_start, status in rows:
+            try:
+                if config_data:
+                    config = json.loads(config_data)
+                    transport = config.get('transport', 'sse')
+                    mode = config.get('mode', 'public')
+                else:
+                    transport = 'sse'
+                    mode = 'public'
+                
+                servers[name] = {
+                    'transport': transport,
+                    'mode': mode,
+                    'auto_start': auto_start,
+                    'status': status or 'stopped'
+                }
+                print(f"   🗄️  {name}: from database (transport: {transport}, mode: {mode}, status: {status or 'stopped'})")
+                
+            except Exception as e:
+                print(f"   ⚠️  Error parsing config for {name}: {e}")
+                # Use defaults
+                servers[name] = {
+                    'transport': 'sse',
+                    'mode': 'public', 
+                    'auto_start': auto_start,
+                    'status': 'stopped'
+                }
+        
+        conn.close()
+        
+        if servers:
+            print(f"✅ Loaded {len(servers)} servers from database")
+        else:
+            print(f"ℹ️  No servers found in database")
+            
+        return servers
+        
+    except Exception as e:
+        print(f"❌ Error loading servers from database: {e}")
+        return {}
+
+
 def load_servers_from_db(db_path: str = "./data/mcp_servers.db") -> List[Tuple]:
     """
     Loads servers from the database (for config details) and combines with API status
+    MODIFIED: Falls back to database-only mode when API is unavailable
     """
     try:
         if not os.path.exists(db_path):
             print(f"Error: Database file '{db_path}' not found!")
             return []
 
-        # First, get truly running servers from the API
+        # First, try to get truly running servers from the API
         running_servers = get_running_servers_from_api()
+        
         if not running_servers:
-            print("⚠️  No running servers found via API")
+            print("⚠️  API unavailable - falling back to database-only mode")
+            print("💡 All servers from database will be included in config")
+            
+            # FALLBACK: Load all servers from database instead of just running ones
+            running_servers = get_all_servers_from_database(db_path)
+
+        if not running_servers:
+            print("❌ No servers found in database!")
+            print("\nTips:")
+            print("- Add servers with: python mcp_manager.py add <name> <script_path>")
+            print("- Check database with: python mcp_manager.py list")
             return []
 
-        print(f"\n📋 Found {len(running_servers)} running servers, loading config from DB...")
+        print(f"\n📋 Processing {len(running_servers)} servers...")
 
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
-        # Try to load config details from the database for running servers
         converted_servers = []
         
         for server_name, server_info in running_servers.items():
             try:
-                # Try to load from the database
                 cursor.execute("""
                     SELECT name, script_path, description, config_data
                     FROM mcp_servers
@@ -154,25 +223,24 @@ def load_servers_from_db(db_path: str = "./data/mcp_servers.db") -> List[Tuple]:
                         mode = server_info.get('mode', 'public')
                         
                     print(f"   📂 {server_name}: loaded from DB (transport: {transport}, mode: {mode})")
+
+                    # Create command, args and env
+                    command = 'python'
+                    args = ['concurrent_mcp_server.py', '--mode', mode]
+                    env = {
+                        'MCP_SERVER_NAME': server_name,
+                        'MCP_TRANSPORT': transport
+                    }
+
+                    # Convert args and env to strings for compatibility
+                    args_str = json.dumps(args)
+                    env_str = json.dumps(env)
+
+                    # Use database status or default to 'configured'
+                    status = server_info.get('status', 'configured')
+                    converted_servers.append((server_name, command, args_str, env_str, status))
                 else:
-                    # Server is running but not in DB - use default config
-                    transport = server_info.get('transport', 'sse')
-                    mode = server_info.get('mode', 'public')
-                    print(f"   🆕 {server_name}: not in DB, using defaults (transport: {transport}, mode: {mode})")
-
-                # Create command, args and env
-                command = 'python'
-                args = ['concurrent_mcp_server.py', '--mode', mode]
-                env = {
-                    'MCP_SERVER_NAME': server_name,
-                    'MCP_TRANSPORT': transport
-                }
-
-                # Convert args and env to strings for compatibility
-                args_str = json.dumps(args)
-                env_str = json.dumps(env)
-
-                converted_servers.append((server_name, command, args_str, env_str, 'running'))
+                    print(f"   ⚠️  {server_name}: found in index but not in database")
                 
             except Exception as e:
                 print(f"   ⚠️  Error processing {server_name}: {e}")
@@ -246,6 +314,9 @@ def create_config(base_url: str, servers_data: List[Tuple], output_file: str = "
         "mcpServers": {}
     }
 
+    # ✅ OPRAVA: Inicializácia server_count
+    server_count = 0
+
     # Load endpoints from JSON files if filtering is enabled
     server_tools_from_json = {}
     if enable_filter:
@@ -260,7 +331,7 @@ def create_config(base_url: str, servers_data: List[Tuple], output_file: str = "
     for server in servers_data:
         if len(server) >= 4:
             name, command, args_str, env_str = server[:4]
-            status = server[4] if len(server) > 4 else "running"
+            status = server[4] if len(server) > 4 else "configured"
         else:
             print(f"Warning: Incomplete server data: {server}")
             continue
@@ -303,14 +374,33 @@ def create_config(base_url: str, servers_data: List[Tuple], output_file: str = "
             print(f"ℹ️  {name}: Tool filtering disabled")
 
         config["mcpServers"][name] = server_config
+        server_count += 1
 
-    # Write to file
+    # Write to file with better error handling
     try:
+        # Create directory if it doesn't exist
+        output_dir = os.path.dirname(output_file)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+            print(f"📁 Created directory: {output_dir}")
+
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
+        
         print(f"\n📝 Config file created: {output_file}")
+        print(f"📊 Configured {server_count} servers")
+        
+        # Verify file was actually created
+        if os.path.exists(output_file):
+            file_size = os.path.getsize(output_file)
+            print(f"✅ File verified: {output_file} ({file_size} bytes)")
+        else:
+            print(f"❌ Warning: File creation may have failed - {output_file} not found")
+            
     except Exception as e:
-        print(f"Error writing config file: {e}")
+        print(f"❌ Error writing config file: {e}")
+        print(f"📁 Target directory: {os.path.dirname(os.path.abspath(output_file))}")
+        print(f"🔒 Permissions: Check if you have write access to the directory")
         return {}
 
     return config
@@ -352,7 +442,7 @@ def show_endpoints(config: Dict[str, Any]) -> None:
         print("No servers configured!")
         return
 
-    print(f"\n🚀 Available endpoints with tool filtering:")
+    print(f"\n� Available endpoints with tool filtering:")
     print(f"📡 Base URL: {base_url}")
     print(f"🔧 Local address: http://localhost:9000")
     print()
@@ -437,17 +527,45 @@ Examples:
     servers = load_servers_from_db(args.db)
 
     if not servers:
-        print("❌ No running servers found!")
-        print("\nTips:")
-        print("- Make sure mcp_wrapper.py is running: python mcp_wrapper.py")
-        print("- Check server status: python mcp_manager.py list")
-        sys.exit(1)
+        print("❌ No servers found!")
+        print("\nPossible solutions:")
+        print("1. Add servers: python mcp_manager.py add <name> <script_path>")
+        print("2. Start API wrapper: python mcp_wrapper.py")
+        print("3. Check server status: python mcp_manager.py list")
+        
+        # Create empty config anyway
+        print("\n🔧 Creating empty config file for future use...")
+        empty_config = {
+            "mcpProxy": {
+                "baseURL": base_url,
+                "addr": ":9000",
+                "name": "MCP Proxy", 
+                "version": "1.0.0",
+                "options": {
+                    "logEnabled": True,
+                    "authTokens": []
+                }
+            },
+            "mcpServers": {}
+        }
+        
+        try:
+            with open(args.output, 'w', encoding='utf-8') as f:
+                json.dump(empty_config, f, indent=2, ensure_ascii=False)
+            print(f"✅ Empty config created: {args.output}")
+            print(f"� Add servers and run this script again to populate config")
+        except Exception as e:
+            print(f"❌ Failed to create empty config: {e}")
+            sys.exit(1)
+            
+        sys.exit(0)  # Exit successfully with empty config
 
-    print(f"\n✅ Found {len(servers)} running servers:")
+    print(f"\n✅ Found {len(servers)} servers:")
     for i, server in enumerate(servers, 1):
         name = server[0]
         command = server[1] if len(server) > 1 else "python"
-        print(f"  {i}. {name} ({command})")
+        status = server[4] if len(server) > 4 else "configured"
+        print(f"  {i}. {name} ({command}) - {status}")
 
     # Create config
     config = create_config(base_url, servers, args.output, enable_filter, args.servers_dir)

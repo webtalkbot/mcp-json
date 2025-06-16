@@ -36,14 +36,7 @@ echo "📝 Environment configured:"
 echo "   NGROK_URL: $NGROK_URL"
 echo "   PROXY_PORT: $PROXY_PORT"
 
-# 6. Generate TBXark/mcp-proxy config from database
-echo "🔄 Generating TBXark MCP proxy config..."
-python generate_config.py --env-file .env --show-endpoints
-
-if [ $? -ne 0 ]; then
-    echo "❌ Config generation failed!"
-    exit 1
-fi
+# 6. Removed initial config.json generation - now handled by mcp_manager.py
 
 # 7. Start TBXark/mcp-proxy with correct path
 echo "🔄 Starting TBXark MCP proxy on port $PROXY_PORT..."
