@@ -441,38 +441,105 @@ class ConcurrentRESTClient:
             text = text.replace(placeholder, str(value))
         return text
     
-    def _prepare_url_and_params(self, url: str, path_params: Dict[str, str], 
-                               query_params: Dict[str, str], user_params: Dict[str, Any]) -> tuple:
-        """FIXED: Prepares URL with path parameters and query parameters"""
+    # def _prepare_url_and_params(self, url: str, path_params: Dict[str, str],
+    #                            query_params: Dict[str, str], user_params: Dict[str, Any]) -> tuple:
+    #     """FIXED: Prepares URL with path parameters and query parameters"""
+    #     import re
+    #
+    #     # FIXED: Identify which user_params are intended for path substitution
+    #     path_placeholders = set()
+    #     for match in re.finditer(r'\{(\w+)\}', url):
+    #         path_placeholders.add(match.group(1))
+    #
+    #     # FIXED: Split user_params into path and query
+    #     path_user_params = {k: v for k, v in user_params.items() if k in path_placeholders}
+    #     query_user_params = {k: v for k, v in user_params.items() if k not in path_placeholders}
+    #
+    #     # Merge path params
+    #     all_path_params = {}
+    #     all_path_params.update(path_params)  # Default values from config
+    #     all_path_params.update(path_user_params)  # FIXED: Only relevant path params
+    #
+    #     # Replace {placeholders} in URL
+    #     final_url = self._substitute_placeholders(url, all_path_params)
+    #
+    #     # Prepare query parameters
+    #     final_params = {}
+    #     for key, value in query_params.items():
+    #         final_params[key] = self._substitute_placeholders(str(value), user_params)
+    #
+    #     # FIXED: Add remaining user params as query params
+    #     final_params.update(query_user_params)
+    #
+    #     return final_url, final_params
+
+    def _prepare_url_and_params(self, url: str, path_params: Dict[str, str],
+                                query_params: Dict[str, str], user_params: Dict[str, Any]) -> tuple:
+        """FIXED: Smart parameter filtering"""
         import re
-        
-        # FIXED: Identify which user_params are intended for path substitution
+
+        # Get path placeholders
         path_placeholders = set()
         for match in re.finditer(r'\{(\w+)\}', url):
             path_placeholders.add(match.group(1))
-        
-        # FIXED: Split user_params into path and query
+
+        # Split user params
         path_user_params = {k: v for k, v in user_params.items() if k in path_placeholders}
         query_user_params = {k: v for k, v in user_params.items() if k not in path_placeholders}
-        
-        # Merge path params
+
+        # Process path params
         all_path_params = {}
-        all_path_params.update(path_params)  # Default values from config
-        all_path_params.update(path_user_params)  # FIXED: Only relevant path params
-        
-        # Replace {placeholders} in URL
+        all_path_params.update(path_params)
+        all_path_params.update(path_user_params)
         final_url = self._substitute_placeholders(url, all_path_params)
-        
-        # Prepare query parameters
+
+        # SMART QUERY PARAMS PROCESSING
         final_params = {}
-        for key, value in query_params.items():
-            final_params[key] = self._substitute_placeholders(str(value), user_params)
-        
-        # FIXED: Add remaining user params as query params
-        final_params.update(query_user_params)
-        
+        for key, template_value in query_params.items():
+
+            # If user provided this parameter, use it
+            if key in query_user_params:
+                final_params[key] = str(query_user_params[key])
+                continue
+
+            # If template value is a placeholder {param}
+            if isinstance(template_value, str) and template_value.startswith('{') and template_value.endswith('}'):
+                placeholder_name = template_value[1:-1]  # Remove { }
+
+                # Only add if user provided value for this placeholder
+                if placeholder_name in user_params:
+                    final_params[key] = str(user_params[placeholder_name])
+                # Skip if user didn't provide value (don't send empty placeholders)
+
+            # If template value is NOT a placeholder (static value like "1", "movie")
+            else:
+                # NEW: Skip obvious default values to avoid API pollution
+                if self._is_obvious_default(template_value):
+                    continue  # Don't send default values like "1"
+                else:
+                    final_params[key] = str(template_value)  # Send static values
+
         return final_url, final_params
-    
+
+    def _is_obvious_default(self, value: str) -> bool:
+        """Detect obvious default values that shouldn't be sent"""
+        if not isinstance(value, str):
+            return False
+
+        # Common default values to skip
+        obvious_defaults = [
+            "1",  # Default IDs
+            "0",
+            "string",  # OpenAPI default string
+            "true",  # Default boolean
+            "false",
+            "",  # Empty string
+            "all",  # Common default
+            "include"  # Common default
+        ]
+
+        return value in obvious_defaults
+
     def _prepare_body(self, body_template: str, user_data: Dict[str, Any]) -> Optional[str]:
         """Thread-safe preparation of request body"""
         if not body_template:

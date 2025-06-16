@@ -585,15 +585,14 @@ class OpenAPIToMCPConverter:
 
     def _get_endpoint_description(self, operation: Dict[str, Any], method: str, path: str) -> str:
         """Intelligent creation of endpoint description"""
-        # Priority: summary > description > automatic description
-        summary = operation.get('summary', '').strip()
+        # Priority: description > summary > automatic description
         description = operation.get('description', '').strip()
+        summary = operation.get('summary', '').strip()
 
-        if summary:
+        if description:
+            return description
+        elif summary:
             return summary
-        elif description:
-            # Use the first line of description
-            return description.split('\n')[0].strip()
         else:
             # Automatic description based on method and path
             method_descriptions = {
