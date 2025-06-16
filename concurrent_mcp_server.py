@@ -440,7 +440,38 @@ class ConcurrentRESTClient:
             placeholder = f"{{{key}}}"
             text = text.replace(placeholder, str(value))
         return text
-
+    
+    # def _prepare_url_and_params(self, url: str, path_params: Dict[str, str],
+    #                            query_params: Dict[str, str], user_params: Dict[str, Any]) -> tuple:
+    #     """FIXED: Prepares URL with path parameters and query parameters"""
+    #     import re
+    #
+    #     # FIXED: Identify which user_params are intended for path substitution
+    #     path_placeholders = set()
+    #     for match in re.finditer(r'\{(\w+)\}', url):
+    #         path_placeholders.add(match.group(1))
+    #
+    #     # FIXED: Split user_params into path and query
+    #     path_user_params = {k: v for k, v in user_params.items() if k in path_placeholders}
+    #     query_user_params = {k: v for k, v in user_params.items() if k not in path_placeholders}
+    #
+    #     # Merge path params
+    #     all_path_params = {}
+    #     all_path_params.update(path_params)  # Default values from config
+    #     all_path_params.update(path_user_params)  # FIXED: Only relevant path params
+    #
+    #     # Replace {placeholders} in URL
+    #     final_url = self._substitute_placeholders(url, all_path_params)
+    #
+    #     # Prepare query parameters
+    #     final_params = {}
+    #     for key, value in query_params.items():
+    #         final_params[key] = self._substitute_placeholders(str(value), user_params)
+    #
+    #     # FIXED: Add remaining user params as query params
+    #     final_params.update(query_user_params)
+    #
+    #     return final_url, final_params
 
     def _prepare_url_and_params(self, url: str, path_params: Dict[str, str],
                                 query_params: Dict[str, str], user_params: Dict[str, Any]) -> tuple:
