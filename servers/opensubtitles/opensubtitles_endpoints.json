@@ -2,38 +2,38 @@
   "login": {
     "method": "POST",
     "url": "https://api.opensubtitles.com/api/v1/login",
-    "description": "Create a token to authenticate a user. If response code is ```401 Unathorized``` stop sending further requests with the same credentials, login is \"expensive\" operation.\n\nRequest rate limit is 1 request per 1 second.\n\nFurther API requests must continue on returned ```base_url``` host, which can have different cache time for search results and different request rate limits. If ```base_url``` equals ```vip-api.opensubtitles.com``` make sure you always send with every request JWT token (if available), otherwise request might fail with 4xx code.",
+    "description": "Login - Create a token to authenticate a user. If response code is ```401 Unathorized``` stop sending further requests with the same credentials, login is \"expensive\" operation.\n\nRequest rate limit is 1 request per 1 second.\n\nFurther API requests must continue on returned ```base_url``` host, which can have different cache time for search results and different request rate limits. If ```base_url``` equals ```vip-api.opensubtitles.com``` make sure you always send with every request JWT token (if available), otherwise request might fail with 4xx code.",
     "body_template": "{\"username\": \"{username}\", \"password\": \"{password}\"}",
     "timeout": 60
   },
   "logout": {
     "method": "DELETE",
     "url": "https://api.opensubtitles.com/api/v1/logout",
-    "description": "Destroy a user token to end a session. Bearer token is required for this endpoint.",
+    "description": "Logout - Destroy a user token to end a session. Bearer token is required for this endpoint.",
     "timeout": 30
   },
   "formats": {
     "method": "GET",
     "url": "https://api.opensubtitles.com/api/v1/infos/formats",
-    "description": "List subtitle formats recognized by the API",
+    "description": "Subtitle Formats - List subtitle formats recognized by the API",
     "timeout": 30
   },
   "languages": {
     "method": "GET",
     "url": "https://api.opensubtitles.com/api/v1/infos/languages",
-    "description": "Get the languages information",
+    "description": "Languages - Get the languages information",
     "timeout": 30
   },
   "userinfo": {
     "method": "GET",
     "url": "https://api.opensubtitles.com/api/v1/infos/user",
-    "description": "Gather informations about the user authenticated by a bearer token. User information are already sent when user is authenticated, and the remaining downloads is returned with each download, but you can also get these information here.",
+    "description": "User Informations - Gather informations about the user authenticated by a bearer token. User information are already sent when user is authenticated, and the remaining downloads is returned with each download, but you can also get these information here.",
     "timeout": 30
   },
   "popular": {
     "method": "GET",
     "url": "https://api.opensubtitles.com/api/v1/discover/popular",
-    "description": "Discover popular features on opensubtitles.com, according to last 30 days downloads.",
+    "description": "Popular features - Discover popular features on opensubtitles.com, according to last 30 days downloads.",
     "query_params": {
       "language": "{language}",
       "type": "{type}"
@@ -43,7 +43,7 @@
   "latest": {
     "method": "GET",
     "url": "https://api.opensubtitles.com/api/v1/discover/latest",
-    "description": "Lists 60 latest uploaded subtitles",
+    "description": "Latest subtitles - Lists 60 latest uploaded subtitles",
     "query_params": {
       "language": "{language}",
       "type": "{type}"
@@ -53,7 +53,7 @@
   "most_downloaded": {
     "method": "GET",
     "url": "https://api.opensubtitles.com/api/v1/discover/most_downloaded",
-    "description": "Discover popular subtitles, according to last 30 days downloads on opensubtitles.com. This list can be filtered by language code or feature type (movie, episode)",
+    "description": "Most downloaded subtitles - Discover popular subtitles, according to last 30 days downloads on opensubtitles.com. This list can be filtered by language code or feature type (movie, episode)",
     "query_params": {
       "language": "{language}",
       "type": "{type}"
@@ -63,7 +63,7 @@
   "features": {
     "method": "GET",
     "url": "https://api.opensubtitles.com/api/v1/features",
-    "description": "With the \"query\" parameter, search for a Feature from a simple text input. Typically used for a text search or autocomplete.\n\nWith an ID, get basic information and subtitles count for a specific title.\n\nWith the \"query_match\" you can define the matched applied to the query: \n - \"start\" is the default behavior, it will query on the first letter entered to offer suggestions\n - \"word\" will return the match on the word, but not always matching the fulll title, for example searching \"roma\" will return \"holiday in roma\"\n - \"exact\" will exactly match the title, so here searching for \"roma\" will only return the movie(s) named \"roma\" \n\nWith the \"full_search\" you can extend the search to the translations of the title, so \"roma\" will also return \"rome\" \n\n<!-- theme: warning -->\n\n> ### Watch Out!\n>\n> If you create an autocomplete, don't set a too small refresh limit, remember you must not go over 40 requests per 10 seconds!",
+    "description": "Search for features - With the \"query\" parameter, search for a Feature from a simple text input. Typically used for a text search or autocomplete.\n\nWith an ID, get basic information and subtitles count for a specific title.\n\nWith the \"query_match\" you can define the matched applied to the query: \n - \"start\" is the default behavior, it will query on the first letter entered to offer suggestions\n - \"word\" will return the match on the word, but not always matching the fulll title, for example searching \"roma\" will return \"holiday in roma\"\n - \"exact\" will exactly match the title, so here searching for \"roma\" will only return the movie(s) named \"roma\" \n\nWith the \"full_search\" you can extend the search to the translations of the title, so \"roma\" will also return \"rome\" \n\n<!-- theme: warning -->\n\n> ### Watch Out!\n>\n> If you create an autocomplete, don't set a too small refresh limit, remember you must not go over 40 requests per 10 seconds!",
     "query_params": {
       "query": "{query}",
       "type": "{type}",
@@ -79,7 +79,7 @@
   "subtitles": {
     "method": "GET",
     "url": "https://api.opensubtitles.com/api/v1/subtitles",
-    "description": "Find subtitle for a video file. All parameters can be combined following various logics: searching by a specific external id (imdb, tmdb), a file moviehash, or a simple text query.\n\n<!-- theme: warning -->\n> Something wrong? Read about [common mistakes and best practices](docs/2-Best-Practices.md). \n\n> Getting no results? Follow HTTP redirects! ```curl --location``` and use verbose mode\n\n> Use ```imdb_id for``` movie or episode. Use ```parent_imdb_id``` for TV Shows\n\n\n\nImplement the logic that best fits your needs, keeping in mind the following guidelines:\n\n- If you can obtain the moviehash from the file, please send it along.\n- If you possess the ID, whether it's IMDB or TMDB, send it instead of a query, as an ID provides more precision.\n- When searching for TV show episodes, it is recommended to send the parent ID, along with the episode and season number for optimal results.  If you have the unique ID of an episode, only send this ID, excluding the episode or season number.\n- Include the filename as a query parameter along with the moviehash for improved results. If your filenames are generally irrelevant, such as dynamically generated filenames from a streaming service, there's no need to include them.\n- Consider treating parameters as filters rather than additional criteria. If you have a specific ID and send a query with conflicting data, like a wrong year, it could result in fewer matches.\n- Explore querying the /features endpoint to gather the exact list of available episodes.\n- Keep in mind that this is a collaborative project where subtitles are submitted by users, filtered by admins, and movie/show results are processed through various APIs. Occasionally, errors may occur, and we depend on user feedback to address and rectify them.\n\n\n> Avoid http redirection by sending request parameters sorted and without default values, and send all queries in lowercase. Remove leading zeroes in ID parameters (IMDB ID, TMDB ID...)\n\n### Moviehash \nIf a ```moviehash``` is sent with a request, a ```moviehash_match``` boolean field will be added to the response.\n\nThe matching subtitles will always come first in the response.\n\n\n### Ordering\n\n<!-- theme: warning -->\n> If possible, don't order results, because sorting on server is \"expensive, time consuming operation\" and also you have much higher chance to get cached result when not using this function.\n\nYou can order the results using the ```order_by``` parameter. Ordering is possible on the following fields:\n```language```, ```download_count```, ```new_download_count```, ```hearing_impaired```, ```hd```, ```fps```, ```votes```, ```points```, ```ratings```, ```from_trusted```, ```foreign_parts_only```, ```ai_translated```, ```machine_translated```, ```upload_date```, ```release```, ```comments```\n\nChange the order direction with *order_direction* (asc/desc)\n\n### Final notes\n```ai_translated``` (default include in search results) subtitles should be much better quality than ```machine_translated``` subtitles (excluded in search results).",
+    "description": "Search for subtitles - Find subtitle for a video file. All parameters can be combined following various logics: searching by a specific external id (imdb, tmdb), a file moviehash, or a simple text query.\n\n<!-- theme: warning -->\n> Something wrong? Read about [common mistakes and best practices](docs/2-Best-Practices.md). \n\n> Getting no results? Follow HTTP redirects! ```curl --location``` and use verbose mode\n\n> Use ```imdb_id for``` movie or episode. Use ```parent_imdb_id``` for TV Shows\n\n\n\nImplement the logic that best fits your needs, keeping in mind the following guidelines:\n\n- If you can obtain the moviehash from the file, please send it along.\n- If you possess the ID, whether it's IMDB or TMDB, send it instead of a query, as an ID provides more precision.\n- When searching for TV show episodes, it is recommended to send the parent ID, along with the episode and season number for optimal results.  If you have the unique ID of an episode, only send this ID, excluding the episode or season number.\n- Include the filename as a query parameter along with the moviehash for improved results. If your filenames are generally irrelevant, such as dynamically generated filenames from a streaming service, there's no need to include them.\n- Consider treating parameters as filters rather than additional criteria. If you have a specific ID and send a query with conflicting data, like a wrong year, it could result in fewer matches.\n- Explore querying the /features endpoint to gather the exact list of available episodes.\n- Keep in mind that this is a collaborative project where subtitles are submitted by users, filtered by admins, and movie/show results are processed through various APIs. Occasionally, errors may occur, and we depend on user feedback to address and rectify them.\n\n\n> Avoid http redirection by sending request parameters sorted and without default values, and send all queries in lowercase. Remove leading zeroes in ID parameters (IMDB ID, TMDB ID...)\n\n### Moviehash \nIf a ```moviehash``` is sent with a request, a ```moviehash_match``` boolean field will be added to the response.\n\nThe matching subtitles will always come first in the response.\n\n\n### Ordering\n\n<!-- theme: warning -->\n> If possible, don't order results, because sorting on server is \"expensive, time consuming operation\" and also you have much higher chance to get cached result when not using this function.\n\nYou can order the results using the ```order_by``` parameter. Ordering is possible on the following fields:\n```language```, ```download_count```, ```new_download_count```, ```hearing_impaired```, ```hd```, ```fps```, ```votes```, ```points```, ```ratings```, ```from_trusted```, ```foreign_parts_only```, ```ai_translated```, ```machine_translated```, ```upload_date```, ```release```, ```comments```\n\nChange the order direction with *order_direction* (asc/desc)\n\n### Final notes\n```ai_translated``` (default include in search results) subtitles should be much better quality than ```machine_translated``` subtitles (excluded in search results).",
     "query_params": {
       "id": "1",
       "imdb_id": "1",
@@ -110,14 +110,14 @@
   "download": {
     "method": "POST",
     "url": "https://api.opensubtitles.com/api/v1/download",
-    "description": "Request a download url for a subtitle. Subtitle file in temporary URL will be always in UTF-8 encoding.\n\n<!-- theme: warning -->\n\n> VERY IMPORTANT: In HTTP request must be both headers: ```Api-Key``` and ```Authorization``` stoplight.io doesn't allow to use in shown example both headers\n\n\n> The download count is calculated on this action, not the file download itself\n\n> IN and OUT FPS must be indicated for subtitle conversions, we want to make sure you know what you are doing, and therefore collected the current FPS from the subtitle search result, or calculated it somehow.\n\n<!-- theme: warning -->\n\n> The download URL is temporary, and cannot be used more than 3 hours, so do not cache it, but you can download the file more than once if needed.",
-    "body_template": "{\"file_id\": \"{file_id}\", \"sub_format\": \"{sub_format}\", \"file_name\": \"{file_name}\", \"in_fps\": \"{in_fps}\", \"out_fps\": \"{out_fps}\", \"timeshift\": \"{timeshift}\", \"force_download\": \"{force_download}\"}",
+    "description": "Download - Request a download url for a subtitle. Subtitle file in temporary URL will be always in UTF-8 encoding.",
+    "body_template": "{\"file_id\": {file_id}}",
     "timeout": 60
   },
   "guessit": {
     "method": "GET",
     "url": "https://api.opensubtitles.com/api/v1/utilities/guessit",
-    "description": "Extracts as much information as possible from a video filename.\n\nIt has a very powerful matcher that allows to guess properties from a video using its filename only. This matcher works with both movies and tv shows episodes.\n\nThis is a simple implementation of the python guessit library.\nhttps://guessit-io.github.io/guessit/\n\nFind examples of the returned data.\nhttps://guessit-io.github.io/guessit/properties/",
+    "description": "Guessit - Extracts as much information as possible from a video filename.\n\nIt has a very powerful matcher that allows to guess properties from a video using its filename only. This matcher works with both movies and tv shows episodes.\n\nThis is a simple implementation of the python guessit library.\nhttps://guessit-io.github.io/guessit/\n\nFind examples of the returned data.\nhttps://guessit-io.github.io/guessit/properties/",
     "query_params": {
       "filename": "{filename}"
     },
@@ -126,31 +126,31 @@
   "get_credits": {
     "method": "GET",
     "url": "https://api.opensubtitles.com/api/v1/ai/credits",
-    "description": "Check how much credits have logged-in user. \n[Buy Credits](../open_api.json/paths/~1ai~1credits~1buy/get)",
+    "description": "User Credits Informations - Check how much credits have logged-in user. \n[Buy Credits](../open_api.json/paths/~1ai~1credits~1buy/get)",
     "timeout": 30
   },
   "buy_credits": {
     "method": "GET",
     "url": "https://api.opensubtitles.com/api/v1/ai/credits/buy",
-    "description": "Buy credits - packages with checkout URL",
+    "description": "Buy Credits - Buy credits - packages with checkout URL",
     "timeout": 30
   },
   "translation": {
     "method": "GET",
     "url": "https://api.opensubtitles.com/api/v1/ai/info/translation",
-    "description": "Available translation APIs and Languages. User doesn't need to be authentificated.",
+    "description": "AI Translation - Available translation APIs and Languages. User doesn't need to be authentificated.",
     "timeout": 30
   },
   "transcription": {
     "method": "GET",
     "url": "https://api.opensubtitles.com/api/v1/ai/info/transcription",
-    "description": "Available transcription APIs and languages. User doesn't need to be authentificated.",
+    "description": "AI Transcription - Available transcription APIs and languages. User doesn't need to be authentificated.",
     "timeout": 30
   },
   "translate": {
     "method": "POST",
     "url": "https://api.opensubtitles.com/api/v1/ai/translate",
-    "description": "**Translate** subtitles using AI from one language to another language. \nCredits on user account are needed. [Buy Credits](../open_api.json/paths/~1ai~1credits~1buy/get)\n\nMethod is returning \n```\n{\n  \"status\": \"CREATED\",\n  \"correlation_id\": \"67eda18f52e11\"\n}\n```\nStatus possible values: \n```\nCREATED     -> Initial state`\nPENDING     -> procedure is still running\nCOMPLETED   -> remote procedure call is completed and has a result\nERROR       -> procedure resulted in an error and is not running anymore\nTIMEOUT     -> No matching procedure call found before timeout\n```\nUsing `correlation_id` can check status of job using GET",
+    "description": "AI Translate - **Translate** subtitles using AI from one language to another language. \nCredits on user account are needed. [Buy Credits](../open_api.json/paths/~1ai~1credits~1buy/get)\n\nMethod is returning \n```\n{\n  \"status\": \"CREATED\",\n  \"correlation_id\": \"67eda18f52e11\"\n}\n```\nStatus possible values: \n```\nCREATED     -> Initial state`\nPENDING     -> procedure is still running\nCOMPLETED   -> remote procedure call is completed and has a result\nERROR       -> procedure resulted in an error and is not running anymore\nTIMEOUT     -> No matching procedure call found before timeout\n```\nUsing `correlation_id` can check status of job using GET",
     "query_params": {
       "api": "{api}",
       "file": "{file}",
@@ -162,7 +162,7 @@
   "transcribe": {
     "method": "POST",
     "url": "https://api.opensubtitles.com/api/v1/ai/transcribe",
-    "description": "**Transcribe** media (audio, video) file using AI into subtitles. Max size of file: 100 MB \n\nCredits on user account are needed. [Buy Credits](../open_api.json/paths/~1ai~1credits~1buy/get)\n\nMethod is returning \n```\n{\n  \"status\": \"CREATED\",\n  \"correlation_id\": \"67eda18f52e11\"\n}\n```\nStatus possible values: \n```\nCREATED     -> Initial state`\nPENDING     -> procedure is still running\nCOMPLETED   -> remote procedure call is completed and has a result\nERROR       -> procedure resulted in an error and is not running anymore\nTIMEOUT     -> No matching procedure call found before timeout\n```\nUsing `correlation_id` can check status of job using GET",
+    "description": "AI Transcribe - **Transcribe** media (audio, video) file using AI into subtitles. Max size of file: 100 MB \n\nCredits on user account are needed. [Buy Credits](../open_api.json/paths/~1ai~1credits~1buy/get)\n\nMethod is returning \n```\n{\n  \"status\": \"CREATED\",\n  \"correlation_id\": \"67eda18f52e11\"\n}\n```\nStatus possible values: \n```\nCREATED     -> Initial state`\nPENDING     -> procedure is still running\nCOMPLETED   -> remote procedure call is completed and has a result\nERROR       -> procedure resulted in an error and is not running anymore\nTIMEOUT     -> No matching procedure call found before timeout\n```\nUsing `correlation_id` can check status of job using GET",
     "query_params": {
       "api": "{api}",
       "file": "{file}",
@@ -173,7 +173,7 @@
   "translate_status": {
     "method": "GET",
     "url": "https://api.opensubtitles.com/api/v1/ai/translate/{correlation_id}",
-    "description": "Get status of **[translate](..open_api.json/paths/~1ai~1translate/post)** job using `correlation_id`",
+    "description": "AI Translate status - Get status of **[translate](..open_api.json/paths/~1ai~1translate/post)** job using `correlation_id`",
     "path_params": {
       "correlation_id": "{correlation_id}"
     },
@@ -182,7 +182,7 @@
   "transcribe_status": {
     "method": "GET",
     "url": "https://api.opensubtitles.com/api/v1/ai/transcribe/{correlation_id}",
-    "description": "Get status of **[transcribe](../open_api.json/paths/~1ai~1transcribe)** job using `correlation_id`",
+    "description": "AI Transcribe status - Get status of **[transcribe](../open_api.json/paths/~1ai~1transcribe)** job using `correlation_id`",
     "path_params": {
       "correlation_id": "{correlation_id}"
     },

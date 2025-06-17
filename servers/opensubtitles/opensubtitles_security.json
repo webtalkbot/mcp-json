@@ -3,7 +3,6 @@
   "config": {
     "headers": {
       "Api-Key": "${OPENSUBTITLES_API_KEY}",
-      "Authorization": "Bearer ${OPENSUBTITLES_BEARER_TOKEN}",
       "User-Agent": "MCP-Opensubtitles/1.0",
       "Accept": "application/json",
       "Content-Type": "application/json"
