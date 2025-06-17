@@ -584,15 +584,17 @@ class OpenAPIToMCPConverter:
         return f"{base_url}{path}"
 
     def _get_endpoint_description(self, operation: Dict[str, Any], method: str, path: str) -> str:
-        """Intelligent creation of endpoint description"""
-        # Priority: description > summary > automatic description
+        """Intelligent creation of endpoint description with summary and description merge"""
         description = operation.get('description', '').strip()
         summary = operation.get('summary', '').strip()
 
-        if description:
-            return description
+        # Zlúčenie summary a description
+        if summary and description:
+            return f"{summary} - {description}"
         elif summary:
             return summary
+        elif description:
+            return description
         else:
             # Automatic description based on method and path
             method_descriptions = {
