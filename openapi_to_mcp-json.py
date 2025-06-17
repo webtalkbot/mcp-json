@@ -386,7 +386,7 @@ class OpenAPIToMCPConverter:
 
     def _create_json_template(self, schema: Dict[str, Any]) -> str:
         """Creates a JSON template from schema with intelligent typing"""
-        
+
         def process_schema(sch: Dict[str, Any], level: int = 0, prop_name: str = None) -> Any:
             if level > 3:  # Protection against infinite recursion
                 return "{...}"
@@ -413,7 +413,7 @@ class OpenAPIToMCPConverter:
             else:  # string and others
                 if 'enum' in sch:
                     return f"{{{prop_name or 'enum_value'}}}"
-                return f"{{{prop_name or 'string'}}}"
+                return f"\"{{{prop_name or 'string'}}}\""
 
         template_obj = process_schema(schema)
         return json.dumps(template_obj, ensure_ascii=False, indent=None)
