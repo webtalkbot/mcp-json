@@ -405,25 +405,25 @@ class OpenAPIToMCPConverter:
                 return [process_schema(items_schema, level + 1, prop_name)]
 
             elif sch_type in ['integer', 'number']:
-                # Pre čísla - vrátime placeholder objekt, nie string
+                # Pre čísla - vrátime placeholder objekt bez úvodzoviek
                 return f"_PLACEHOLDER_{{{prop_name or 'number'}}}_PLACEHOLDER_"
 
             elif sch_type == 'boolean':
-                # Pre boolean - vrátime placeholder objekt, nie string
+                # Pre boolean - vrátime placeholder objekt bez úvodzoviek
                 return f"_PLACEHOLDER_{{{prop_name or 'boolean'}}}_PLACEHOLDER_"
 
             else:  # string and others
                 if 'enum' in sch:
-                    # Pre enum - môže byť string alebo iný typ
-                    return f"_PLACEHOLDER_{{{prop_name or 'enum_value'}}}_PLACEHOLDER_"
-                # Pre string - vrátime normálny placeholder so správnymi úvodzovkami
-                return f"{{{prop_name or 'string'}}}"
+                    # Pre enum - môže byť string alebo iný typ, defaultne string
+                    return f"\"{{{prop_name or 'enum_value'}}}\""
+                # Pre string - vrátime placeholder s úvodzovkami
+                return f"\"{{{prop_name or 'string'}}}\""
 
         template_obj = process_schema(schema)
         json_str = json.dumps(template_obj, ensure_ascii=False, indent=None)
 
-        # Odstránime placeholder markery a úvodzovky pre non-string typy
-        json_str = re.sub(r'"_PLACEHOLDER_([^"]+)_PLACEHOLDER_"', r'\1', json_str)
+        # Odstránime placeholder markery pre non-string typy (čísla, boolean)
+        json_str = re.sub(r'"_PLACEHOLDER_{([^}]+)}_PLACEHOLDER_"', r'{\1}', json_str)
 
         return json_str
 

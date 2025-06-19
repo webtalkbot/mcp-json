@@ -1,17 +1,4 @@
 {
-  "login": {
-    "method": "POST",
-    "url": "https://api.opensubtitles.com/api/v1/login",
-    "description": "Login - Create a token to authenticate a user. If response code is ```401 Unathorized``` stop sending further requests with the same credentials, login is \"expensive\" operation.\n\nRequest rate limit is 1 request per 1 second.\n\nFurther API requests must continue on returned ```base_url``` host, which can have different cache time for search results and different request rate limits. If ```base_url``` equals ```vip-api.opensubtitles.com``` make sure you always send with every request JWT token (if available), otherwise request might fail with 4xx code.",
-    "body_template": "{\"username\": \"{username}\", \"password\": \"{password}\"}",
-    "timeout": 60
-  },
-  "logout": {
-    "method": "DELETE",
-    "url": "https://api.opensubtitles.com/api/v1/logout",
-    "description": "Logout - Destroy a user token to end a session. Bearer token is required for this endpoint.",
-    "timeout": 30
-  },
   "formats": {
     "method": "GET",
     "url": "https://api.opensubtitles.com/api/v1/infos/formats",
@@ -22,12 +9,6 @@
     "method": "GET",
     "url": "https://api.opensubtitles.com/api/v1/infos/languages",
     "description": "Languages - Get the languages information",
-    "timeout": 30
-  },
-  "userinfo": {
-    "method": "GET",
-    "url": "https://api.opensubtitles.com/api/v1/infos/user",
-    "description": "User Informations - Gather informations about the user authenticated by a bearer token. User information are already sent when user is authenticated, and the remaining downloads is returned with each download, but you can also get these information here.",
     "timeout": 30
   },
   "popular": {
@@ -110,8 +91,8 @@
   "download": {
     "method": "POST",
     "url": "https://api.opensubtitles.com/api/v1/download",
-    "description": "Download - Request a download url for a subtitle. Subtitle file in temporary URL will be always in UTF-8 encoding.",
-    "body_template": "{\"file_id\": {file_id}}",
+    "description": "Download subtitles - Request a download url for a subtitle. Subtitle file in temporary URL will be always in UTF-8 encoding.",
+    "body_template": "{\"file_id\": \"{file_id}\"}", 
     "timeout": 60
   },
   "guessit": {
@@ -120,71 +101,6 @@
     "description": "Guessit - Extracts as much information as possible from a video filename.\n\nIt has a very powerful matcher that allows to guess properties from a video using its filename only. This matcher works with both movies and tv shows episodes.\n\nThis is a simple implementation of the python guessit library.\nhttps://guessit-io.github.io/guessit/\n\nFind examples of the returned data.\nhttps://guessit-io.github.io/guessit/properties/",
     "query_params": {
       "filename": "{filename}"
-    },
-    "timeout": 30
-  },
-  "get_credits": {
-    "method": "GET",
-    "url": "https://api.opensubtitles.com/api/v1/ai/credits",
-    "description": "User Credits Informations - Check how much credits have logged-in user. \n[Buy Credits](../open_api.json/paths/~1ai~1credits~1buy/get)",
-    "timeout": 30
-  },
-  "buy_credits": {
-    "method": "GET",
-    "url": "https://api.opensubtitles.com/api/v1/ai/credits/buy",
-    "description": "Buy Credits - Buy credits - packages with checkout URL",
-    "timeout": 30
-  },
-  "translation": {
-    "method": "GET",
-    "url": "https://api.opensubtitles.com/api/v1/ai/info/translation",
-    "description": "AI Translation - Available translation APIs and Languages. User doesn't need to be authentificated.",
-    "timeout": 30
-  },
-  "transcription": {
-    "method": "GET",
-    "url": "https://api.opensubtitles.com/api/v1/ai/info/transcription",
-    "description": "AI Transcription - Available transcription APIs and languages. User doesn't need to be authentificated.",
-    "timeout": 30
-  },
-  "translate": {
-    "method": "POST",
-    "url": "https://api.opensubtitles.com/api/v1/ai/translate",
-    "description": "AI Translate - **Translate** subtitles using AI from one language to another language. \nCredits on user account are needed. [Buy Credits](../open_api.json/paths/~1ai~1credits~1buy/get)\n\nMethod is returning \n```\n{\n  \"status\": \"CREATED\",\n  \"correlation_id\": \"67eda18f52e11\"\n}\n```\nStatus possible values: \n```\nCREATED     -> Initial state`\nPENDING     -> procedure is still running\nCOMPLETED   -> remote procedure call is completed and has a result\nERROR       -> procedure resulted in an error and is not running anymore\nTIMEOUT     -> No matching procedure call found before timeout\n```\nUsing `correlation_id` can check status of job using GET",
-    "query_params": {
-      "api": "{api}",
-      "file": "{file}",
-      "translate_from": "auto",
-      "translate_to": "{translate_to}"
-    },
-    "timeout": 60
-  },
-  "transcribe": {
-    "method": "POST",
-    "url": "https://api.opensubtitles.com/api/v1/ai/transcribe",
-    "description": "AI Transcribe - **Transcribe** media (audio, video) file using AI into subtitles. Max size of file: 100 MB \n\nCredits on user account are needed. [Buy Credits](../open_api.json/paths/~1ai~1credits~1buy/get)\n\nMethod is returning \n```\n{\n  \"status\": \"CREATED\",\n  \"correlation_id\": \"67eda18f52e11\"\n}\n```\nStatus possible values: \n```\nCREATED     -> Initial state`\nPENDING     -> procedure is still running\nCOMPLETED   -> remote procedure call is completed and has a result\nERROR       -> procedure resulted in an error and is not running anymore\nTIMEOUT     -> No matching procedure call found before timeout\n```\nUsing `correlation_id` can check status of job using GET",
-    "query_params": {
-      "api": "{api}",
-      "file": "{file}",
-      "language": "{language}"
-    },
-    "timeout": 60
-  },
-  "translate_status": {
-    "method": "GET",
-    "url": "https://api.opensubtitles.com/api/v1/ai/translate/{correlation_id}",
-    "description": "AI Translate status - Get status of **[translate](..open_api.json/paths/~1ai~1translate/post)** job using `correlation_id`",
-    "path_params": {
-      "correlation_id": "{correlation_id}"
-    },
-    "timeout": 30
-  },
-  "transcribe_status": {
-    "method": "GET",
-    "url": "https://api.opensubtitles.com/api/v1/ai/transcribe/{correlation_id}",
-    "description": "AI Transcribe status - Get status of **[transcribe](../open_api.json/paths/~1ai~1transcribe)** job using `correlation_id`",
-    "path_params": {
-      "correlation_id": "{correlation_id}"
     },
     "timeout": 30
   }
