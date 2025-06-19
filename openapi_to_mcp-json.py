@@ -385,9 +385,10 @@ class OpenAPIToMCPConverter:
             return self._create_json_template(schema)
 
     def _create_json_template(self, schema: Dict[str, Any]) -> str:
-        """Creates a JSON template from schema with intelligent typing"""
+        """Creates a JSON template from schema with intelligent typing - ONLY REQUIRED FIELDS"""
 
-        def process_schema(sch: Dict[str, Any], level: int = 0, prop_name: str = None) -> Any:
+        def process_schema(sch: Dict[str, Any], level: int = 0, prop_name: str = None,
+                           required_fields: List[str] = None) -> Any:
             if level > 3:  # Protection against infinite recursion
                 return "{...}"
 
@@ -395,34 +396,36 @@ class OpenAPIToMCPConverter:
 
             if sch_type == 'object':
                 properties = sch.get('properties', {})
+                required = sch.get('required', [])  # ← NOVÉ: Získame required polia
                 result = {}
+
+                # ← NOVÉ: Spracujeme len required polia
                 for current_prop_name, prop_schema in properties.items():
-                    result[current_prop_name] = process_schema(prop_schema, level + 1, current_prop_name)
+                    if current_prop_name in required:  # ← NOVÉ: Len ak je required
+                        result[current_prop_name] = process_schema(
+                            prop_schema, level + 1, current_prop_name, required
+                        )
                 return result
 
             elif sch_type == 'array':
                 items_schema = sch.get('items', {'type': 'string'})
-                return [process_schema(items_schema, level + 1, prop_name)]
+                return [process_schema(items_schema, level + 1, prop_name, required_fields)]
 
             elif sch_type in ['integer', 'number']:
-                # Pre čísla - vrátime placeholder objekt bez úvodzoviek
                 return f"_PLACEHOLDER_{{{prop_name or 'number'}}}_PLACEHOLDER_"
 
             elif sch_type == 'boolean':
-                # Pre boolean - vrátime placeholder objekt bez úvodzoviek
                 return f"_PLACEHOLDER_{{{prop_name or 'boolean'}}}_PLACEHOLDER_"
 
             else:  # string and others
                 if 'enum' in sch:
-                    # Pre enum - môže byť string alebo iný typ, defaultne string
-                    return f"{{{prop_name or 'enum_value'}}}"  # OPRAVENÉ: bez úvodzoviek tu
-                # Pre string - vrátime placeholder bez úvodzoviek tu
-                return f"{{{prop_name or 'string'}}}"  # OPRAVENÉ: bez úvodzoviek tu
+                    return f"{{{prop_name or 'enum_value'}}}"
+                return f"{{{prop_name or 'string'}}}"
 
         template_obj = process_schema(schema)
         json_str = json.dumps(template_obj, ensure_ascii=False, indent=None)
 
-        # Odstránime placeholder markery pre non-string typy (čísla, boolean)
+        # Odstránime placeholder markery pre non-string typy
         json_str = re.sub(r'"_PLACEHOLDER_{([^}]+)}_PLACEHOLDER_"', r'{\1}', json_str)
 
         return json_str
