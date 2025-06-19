@@ -91,8 +91,8 @@
   "download": {
     "method": "POST",
     "url": "https://api.opensubtitles.com/api/v1/download",
-    "description": "Download subtitles - Request a download url for a subtitle. Subtitle file in temporary URL will be always in UTF-8 encoding.",
-    "body_template": "{\"file_id\": \"{file_id}\"}", 
+    "description": "Download - Request a download url for a subtitle. Subtitle file in temporary URL will be always in UTF-8 encoding.\n\n<!-- theme: warning -->\n\n> VERY IMPORTANT: In HTTP request must be both headers: ```Api-Key``` and ```Authorization``` stoplight.io doesn't allow to use in shown example both headers\n\n\n> The download count is calculated on this action, not the file download itself\n\n> IN and OUT FPS must be indicated for subtitle conversions, we want to make sure you know what you are doing, and therefore collected the current FPS from the subtitle search result, or calculated it somehow.\n\n<!-- theme: warning -->\n\n> The download URL is temporary, and cannot be used more than 3 hours, so do not cache it, but you can download the file more than once if needed.",
+    "body_template": "{\"file_id\": {file_id}, \"sub_format\": \"{sub_format}\", \"file_name\": \"{file_name}\", \"in_fps\": {in_fps}, \"out_fps\": {out_fps}, \"timeshift\": {timeshift}, \"force_download\": {force_download}}",
     "timeout": 60
   },
   "guessit": {
