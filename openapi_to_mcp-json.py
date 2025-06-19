@@ -415,9 +415,9 @@ class OpenAPIToMCPConverter:
             else:  # string and others
                 if 'enum' in sch:
                     # Pre enum - môže byť string alebo iný typ, defaultne string
-                    return f"\"{{{prop_name or 'enum_value'}}}\""
-                # Pre string - vrátime placeholder s úvodzovkami
-                return f"\"{{{prop_name or 'string'}}}\""
+                    return f"{{{prop_name or 'enum_value'}}}"  # OPRAVENÉ: bez úvodzoviek tu
+                # Pre string - vrátime placeholder bez úvodzoviek tu
+                return f"{{{prop_name or 'string'}}}"  # OPRAVENÉ: bez úvodzoviek tu
 
         template_obj = process_schema(schema)
         json_str = json.dumps(template_obj, ensure_ascii=False, indent=None)
